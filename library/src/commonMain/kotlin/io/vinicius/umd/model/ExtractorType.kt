@@ -11,6 +11,11 @@ enum class ExtractorType {
     Coomer,
 
     /**
+     * Represents the Kemono (kemono.su) extractor type.
+     */
+    Kemono,
+
+    /**
      * Represents the Reddit (reddit.com) extractor type.
      */
     Reddit,

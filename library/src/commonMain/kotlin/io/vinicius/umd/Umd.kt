@@ -4,6 +4,7 @@ import co.touchlab.kermit.Logger
 import co.touchlab.skie.configuration.annotations.DefaultArgumentInterop
 import io.vinicius.umd.extractor.Extractor
 import io.vinicius.umd.extractor.coomer.Coomer
+import io.vinicius.umd.extractor.kemono.Kemono
 import io.vinicius.umd.extractor.reddit.Reddit
 import io.vinicius.umd.extractor.redgifs.Redgifs
 import io.vinicius.umd.model.Event
@@ -59,6 +60,7 @@ class Umd(
     private fun findExtractor(url: String): Extractor {
         val extractor = when {
             Coomer.isMatch(url) -> Coomer(callback = callback)
+            Kemono.isMatch(url) -> Kemono(callback = callback)
             Reddit.isMatch(url) -> Reddit(callback = callback)
 
             Redgifs.isMatch(url) -> Redgifs(

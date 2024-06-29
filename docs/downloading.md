@@ -46,6 +46,12 @@ If you're downloading a small number of files then you should not have any probl
 
 To circumvent this, when you receive an `HTTP 429` error, it's recommended to wait **at least 15 seconds** before trying to download anything again.
 
+### Kemono
+
+If you're downloading a small number of files then you should not have any problem, however at some point Kemono will stop accepting requests to download the media and it will return an error `HTTP 429 Too Many Request`.
+
+To circumvent this, when you receive an `HTTP 429` error, it's recommended to wait **at least 15 seconds** before trying to download anything again.
+
 ### RedGifs
 
 RedGifs protection requires that the client downloading the file has the same user agent of the client that queried the media URL. That means that if you query the media URL with **UMD** and tries to open it in a browser, for example, it won't work since **UMD** and the browser have different user agents.
