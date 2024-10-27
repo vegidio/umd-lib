@@ -18,7 +18,7 @@ internal class Reddit(
     private val api: RedditApi = RedditApi(),
     private val callback: EventCallback? = null,
 ) : Extractor {
-    private val tag = "Reddit"
+    private val tag = this::class.simpleName.orEmpty()
 
     override suspend fun queryMedia(url: String, limit: Int, extensions: List<String>): Response {
         var sourceName = ""

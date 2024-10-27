@@ -19,7 +19,7 @@ import kotlin.math.max
 internal class Coomer(
     private val callback: EventCallback? = null,
 ) : Extractor {
-    private val tag = "Coomer"
+    private val tag = this::class.simpleName.orEmpty()
     private val fetch = configureFetch()
 
     override suspend fun queryMedia(url: String, limit: Int, extensions: List<String>): Response {
@@ -108,69 +108,84 @@ internal class Coomer(
     }
 
     private suspend fun countPages(url: String): Int {
-        val html = fetch.getString(url)
-        val doc = Ksoup.parse(html)
-        val result = doc.select("div#paginator-top small")
-        val regex = """of (\d+)""".toRegex()
-        val groups = regex.find(result.text())?.groupValues
-        val num = groups?.get(1)?.toFloat() ?: 0f
-        val pages = ceil(num / 50).toInt()
+        return try {
+            val html = fetch.getString(url)
+            val doc = Ksoup.parse(html)
+            val result = doc.select("div#paginator-top small")
+            val regex = """of (\d+)""".toRegex()
+            val groups = regex.find(result.text())?.groupValues
+            val num = groups?.get(1)?.toFloat() ?: 0f
+            val pages = ceil(num / 50).toInt()
 
-        val numPages = max(pages, 1)
-        Logger.d(tag) { "Number of pages found: $numPages" }
+            val numPages = max(pages, 1)
+            Logger.d(tag) { "Number of pages found: $numPages" }
 
-        return numPages
+            numPages
+        } catch (e: Exception) {
+            Logger.e(e, tag) { "Error counting pages: $url" }
+            0
+        }
     }
 
     private suspend fun getPostUrls(url: String): List<String> {
-        val html = fetch.getString(url)
-        val doc = Ksoup.parse(html)
-        val results = doc.select("article")
+        try {
+            val html = fetch.getString(url)
+            val doc = Ksoup.parse(html)
+            val results = doc.select("article")
 
-        return results.map {
-            val id = it.attr("data-id")
-            val service = it.attr("data-service")
-            val user = it.attr("data-user")
+            return results.map {
+                val id = it.attr("data-id")
+                val service = it.attr("data-service")
+                val user = it.attr("data-user")
 
-            "https://coomer.su/$service/user/$user/post/$id"
+                "https://coomer.su/$service/user/$user/post/$id"
+            }
+        } catch (e: Exception) {
+            Logger.e(e, tag) { "Error fetching post URLs: $url" }
+            return emptyList()
         }
     }
 
     private suspend fun getPostMedia(url: String, service: String, user: String): List<Media> {
-        val html = fetch.getString(url)
-        val doc = Ksoup.parse(html)
-        val postId = doc.select("meta[name='id']").attr("content")
-        val result = doc.select("div.post__published")
-        val regex = """Published: (.+)""".toRegex()
-        val groups = regex.find(result.text())?.groupValues
-        val dateTime = groups?.get(1)?.replace(" ", "T")?.toLocalDateTime().toString()
+        return try {
+            val html = fetch.getString(url)
+            val doc = Ksoup.parse(html)
+            val postId = doc.select("meta[name='id']").attr("content")
+            val result = doc.select("div.post__published")
+            val regex = """Published: (.+)""".toRegex()
+            val groups = regex.find(result.text())?.groupValues
+            val dateTime = groups?.get(1)?.replace(" ", "T")?.toLocalDateTime().toString()
 
-        val images = doc.select("a.fileThumb").map {
-            Url.parse(it.attr("href"))
-            Media(
-                Url.parse(it.attr("href")).cleanUrl,
-                mapOf(
-                    "source" to service,
-                    "name" to user,
-                    "id" to postId,
-                    "created" to dateTime,
-                ),
-            )
+            val images = doc.select("a.fileThumb").map {
+                Url.parse(it.attr("href"))
+                Media(
+                    Url.parse(it.attr("href")).cleanUrl,
+                    mapOf(
+                        "source" to service,
+                        "name" to user,
+                        "id" to postId,
+                        "created" to dateTime,
+                    ),
+                )
+            }
+
+            val videos = doc.select("a.post__attachment-link").map {
+                Media(
+                    Url.parse(it.attr("href")).cleanUrl,
+                    mapOf(
+                        "source" to service,
+                        "name" to user,
+                        "id" to postId,
+                        "created" to dateTime,
+                    ),
+                )
+            }
+
+            images + videos
+        } catch (e: Exception) {
+            Logger.e(e, tag) { "Error fetching post media: $url" }
+            emptyList()
         }
-
-        val videos = doc.select("a.post__attachment-link").map {
-            Media(
-                Url.parse(it.attr("href")).cleanUrl,
-                mapOf(
-                    "source" to service,
-                    "name" to user,
-                    "id" to postId,
-                    "created" to dateTime,
-                ),
-            )
-        }
-
-        return images + videos
     }
     // endregion
 

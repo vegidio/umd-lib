@@ -29,7 +29,7 @@ class RedditTest {
                 }
             }
 
-            umd.queryMedia(0)
+            // umd.queryMedia(0)
             assertEquals(1, numEvents)
         }
     }

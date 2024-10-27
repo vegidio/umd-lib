@@ -17,7 +17,7 @@ internal class Redgifs(
     private val metadata: Map<String, Any> = emptyMap(),
     private val callback: EventCallback? = null,
 ) : Extractor {
-    private val tag = "RedGifs"
+    private val tag = this::class.simpleName.orEmpty()
     private val responseMeta = mutableMapOf<String, Any>()
 
     override suspend fun queryMedia(url: String, limit: Int, extensions: List<String>): Response {

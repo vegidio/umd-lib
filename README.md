@@ -28,7 +28,7 @@ With the repository added, you just need to include the dependency in the file `
 
 ```kotlin
 dependencies {
-    implementation("io.vinicius.umd:umd:24.5.0")
+    implementation("io.vinicius.umd:umd:24.10.0")
 }
 ```
 
