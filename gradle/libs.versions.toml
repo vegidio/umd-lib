@@ -1,18 +1,18 @@
 [versions]
-android = "8.2.1"
+android = "8.2.2"
 android-compileSdk = "34"
 android-minSdk = "24"
-coroutines = "1.8.0"
-datetime = "0.5.0"
+coroutines = "1.9.0"
+datetime = "0.6.1"
 detekt = "1.23.5"
 kermit = "2.0.3"
 klopik = "24.5.1"
-kotlin = "1.9.22"
-ksoup = "0.1.2"
+kotlin = "2.0.21"
+ksoup = "0.1.9"
 ktlint = "12.0.3"
 okio = "3.9.0"
-serialization = "1.6.3"
-skie = "0.6.1"
+serialization = "1.7.3"
+skie = "0.9.3"
 slf4j = "2.0.11"
 uri = "0.0.18"
 
@@ -25,17 +25,17 @@ ktlint = { id = "org.jlleitschuh.gradle.ktlint", version.ref = "ktlint" }
 skie = { id = "co.touchlab.skie", version.ref = "skie" }
 
 [libraries]
-coroutines-core = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-core", version.ref = "coroutines" }
-coroutines-js = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-core-js", version.ref = "coroutines" }
-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "coroutines" }
-kermit = { group = "co.touchlab", name = "kermit", version.ref = "kermit" }
-klopik = { group = "io.vinicius.klopik", name = "klopik", version.ref = "klopik" }
-kotlin-datetime = { group = "org.jetbrains.kotlinx", name = "kotlinx-datetime", version.ref = "datetime" }
-kotlin-serialization = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "serialization" }
-kotlin-test = { group = "org.jetbrains.kotlin", name = "kotlin-test", version.ref = "kotlin" }
-ksoup = { group = "com.fleeksoft.ksoup", name = "ksoup", version.ref = "ksoup" }
-okio = { group = "com.squareup.okio", name = "okio", version.ref = "okio" }
-okio-node = { group = "com.squareup.okio", name = "okio-nodefilesystem", version.ref = "okio" }
-skie-annotations = { group = "co.touchlab.skie", name = "configuration-annotations", version.ref = "skie" }
-slf4j = { group = "org.slf4j", name = "slf4j-nop", version.ref = "slf4j" }
-uri = { group = "com.eygraber", name = "uri-kmp", version.ref = "uri" }
+coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
+coroutines-js = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core-js", version.ref = "coroutines" }
+coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "coroutines" }
+kermit = { module = "co.touchlab:kermit", version.ref = "kermit" }
+klopik = { module = "io.vinicius.klopik:klopik", version.ref = "klopik" }
+kotlin-datetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime", version.ref = "datetime" }
+kotlin-serialization = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "serialization" }
+kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
+ksoup = { module = "com.fleeksoft.ksoup:ksoup", version.ref = "ksoup" }
+okio = { module = "com.squareup.okio:okio", version.ref = "okio" }
+okio-node = { module = "com.squareup.okio:okio-nodefilesystem", version.ref = "okio" }
+skie-annotations = { module = "co.touchlab.skie:configuration-annotations", version.ref = "skie" }
+slf4j = { module = "org.slf4j:slf4j-nop", version.ref = "slf4j" }
+uri = { module = "com.eygraber:uri-kmp", version.ref = "uri" }

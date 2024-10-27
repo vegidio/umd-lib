@@ -1,10 +1,10 @@
 *.iml
-.gradle
-.idea
 .DS_Store
+.cxx
+.externalNativeBuild
+.gradle
+.kotlin
 build
 captures
-.externalNativeBuild
-.cxx
 local.properties
 xcuserdata

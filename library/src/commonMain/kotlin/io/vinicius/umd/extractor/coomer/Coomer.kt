@@ -23,9 +23,7 @@ internal class Coomer(
     private val fetch = configureFetch()
 
     override suspend fun queryMedia(url: String, limit: Int, extensions: List<String>): Response {
-        val source = getSourceType(url)
-
-        val media = when (source) {
+        val media = when (val source = getSourceType(url)) {
             is SourceType.User -> fetchUser(source, limit, extensions)
             is SourceType.Post -> fetchPost(source, limit, extensions)
         }
