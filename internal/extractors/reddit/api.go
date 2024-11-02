@@ -8,7 +8,7 @@ import (
 var client = resty.New().
 	SetBaseURL("https://www.reddit.com/")
 
-// GetSubmission retrieves a list of submissions for a given Reddit post ID.
+// getSubmission retrieves a list of submissions for a given Reddit post ID.
 //
 // Example: https://www.reddit.com/comments/1bxsmnr.json?raw_json=1, where <1bxsmnr> is the ID.
 //
@@ -28,7 +28,7 @@ func getSubmission(id string) []Submission {
 	return submissions
 }
 
-// GetUserSubmissions retrieves a list of submissions for a given Reddit user.
+// getUserSubmissions retrieves a list of submissions for a given Reddit user.
 //
 // Example: https://www.reddit.com/user/atomicbrunette18/submitted.json?sort=new&raw_json=1&after=&limit=100, where
 // <atomicbrunette18> is the username.
@@ -43,6 +43,28 @@ func getSubmission(id string) []Submission {
 func getUserSubmissions(user string, after string, limit int) Submission {
 	var submission Submission
 	url := fmt.Sprintf("user/%s/submitted.json?sort=new&raw_json=1&after=%s&limit=%d", user, after, limit)
+
+	_, _ = client.R().
+		SetResult(&submission).
+		Get(url)
+
+	return submission
+}
+
+// getSubredditSubmissions retrieves a list of submissions for a given subreddit.
+//
+// Example: https://www.reddit.com/r/nsfw/hot.json?raw_json=1&after=&limit=100, where <nsfw> is the subreddit name.
+//
+// Parameters:
+//   - subreddit: The name of the subreddit.
+//   - after: The ID of the last submission to start after (for pagination).
+//   - limit: The maximum number of submissions to retrieve.
+//
+// Returns:
+//   - A Submission struct containing the details of the submissions.
+func getSubredditSubmissions(subreddit string, after string, limit int) Submission {
+	var submission Submission
+	url := fmt.Sprintf("r/%s/hot.json?raw_json=1&after=%s&limit=%d", subreddit, after, limit)
 
 	_, _ = client.R().
 		SetResult(&submission).
