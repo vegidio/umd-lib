@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/umd-lib.iml" filepath="$PROJECT_DIR$/umd-lib.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/kmd-lib.iml" filepath="$PROJECT_DIR$/.idea/kmd-lib.iml" />
     </modules>
   </component>
 </project>

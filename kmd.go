@@ -1,4 +1,4 @@
-package umd
+package kmd
 
 import "time"
 
