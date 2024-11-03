@@ -164,3 +164,6 @@ Temporary Items
 ### macOS Patch ###
 # iCloud generated files
 *.icloud
+
+# Test
+pkg/testfile.txt

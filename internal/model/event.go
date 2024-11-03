@@ -1,4 +1,4 @@
-package models
+package model
 
 // Event is the interface that all event types implement.
 // The unexported isEvent method restricts implementation to the same package.

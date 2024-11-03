@@ -2,28 +2,23 @@ package reddit
 
 import (
 	"github.com/thoas/go-funk"
-	"github.com/vegidio/kmd-lib/internal/extractors"
-	"github.com/vegidio/kmd-lib/internal/models"
-	"github.com/vegidio/kmd-lib/pkg"
+	"github.com/vegidio/umd-lib/internal/extractors"
+	"github.com/vegidio/umd-lib/internal/model"
+	"github.com/vegidio/umd-lib/pkg"
 	"reflect"
 	"regexp"
 	"strings"
 )
 
 type Reddit struct {
-	Callback func(models.Event)
+	Callback func(model.Event)
 }
 
-func (r Reddit) IsMatch(url string) bool {
-	found := pkg.HasHost(url, "reddit.com")
-	if found && r.Callback != nil {
-		r.Callback(models.OnExtractorFound{Name: "Reddit"})
-	}
-
-	return found
+func IsMatch(url string) bool {
+	return pkg.HasHost(url, "reddit.com")
 }
 
-func (r Reddit) QueryMedia(url string, limit int, extensions []string) models.Response {
+func (r Reddit) QueryMedia(url string, limit int, extensions []string) model.Response {
 	source := r.getSourceType(url)
 	submissions := r.fetchSubmissions(source, limit, extensions)
 
@@ -31,10 +26,15 @@ func (r Reddit) QueryMedia(url string, limit int, extensions []string) models.Re
 	media := submissionsToMedia(submissions, sourceName, url)
 
 	if r.Callback != nil {
-		r.Callback(models.OnQueryCompleted{Total: len(media)})
+		r.Callback(model.OnQueryCompleted{Total: len(media)})
 	}
 
-	return models.Response{}
+	return model.Response{
+		Url:       url,
+		Media:     media,
+		Extractor: model.Reddit,
+		Metadata:  map[string]interface{}{},
+	}
 }
 
 func (r Reddit) GetFetch() pkg.Fetch {
@@ -74,7 +74,7 @@ func (r Reddit) getSourceType(url string) SourceType {
 
 	if r.Callback != nil {
 		sourceName := strings.TrimPrefix(reflect.TypeOf(source).Name(), "Source")
-		r.Callback(models.OnExtractorTypeFound{Name: sourceName})
+		r.Callback(model.OnExtractorTypeFound{Name: sourceName})
 	}
 
 	return source
@@ -103,7 +103,7 @@ func (r Reddit) fetchSubmissions(source SourceType, limit int, extensions []stri
 
 		if r.Callback != nil {
 			queried := len(submissions) - amountBefore
-			r.Callback(models.OnMediaQueried{Amount: queried})
+			r.Callback(model.OnMediaQueried{Amount: queried})
 		}
 
 		if len(submission.Data.Children) == 0 || len(submissions) >= limit || after == "" {
@@ -118,14 +118,14 @@ func (r Reddit) fetchSubmissions(source SourceType, limit int, extensions []stri
 
 // region - Private functions
 
-func submissionsToMedia(submissions []Child, sourceName string, name string) []models.Media {
-	return funk.Map(submissions, func(submission Child) models.Media {
+func submissionsToMedia(submissions []Child, sourceName string, name string) []model.Media {
+	return funk.Map(submissions, func(submission Child) model.Media {
 		url := submission.Data.SecureMedia.RedditVideo.FallbackUrl
 		if url == "" {
 			url = submission.Data.Url
 		}
 
-		return models.Media{
+		return model.Media{
 			Url: url,
 			Metadata: map[string]interface{}{
 				"source":  sourceName,
@@ -133,7 +133,7 @@ func submissionsToMedia(submissions []Child, sourceName string, name string) []m
 				"created": submission.Data.Created,
 			},
 		}
-	}).([]models.Media)
+	}).([]model.Media)
 }
 
 // endregion

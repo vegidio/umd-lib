@@ -1,4 +1,6 @@
-package models
+package model
+
+import "fmt"
 
 // Response represents a response from a service.
 type Response struct {
@@ -13,4 +15,9 @@ type Response struct {
 
 	// Metadata contains additional metadata about the response.
 	Metadata map[string]interface{}
+}
+
+func (r Response) String() string {
+	return fmt.Sprintf("{Url: %s, Media: %v, Extractor: %s, Metadata: %v}",
+		r.Url, r.Media, r.Extractor, r.Metadata)
 }

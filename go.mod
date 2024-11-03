@@ -1,4 +1,4 @@
-module github.com/vegidio/kmd-lib
+module github.com/vegidio/umd-lib
 
 go 1.23.2
 

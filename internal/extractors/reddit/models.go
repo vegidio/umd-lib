@@ -1,7 +1,7 @@
 package reddit
 
 import (
-	"github.com/vegidio/kmd-lib/pkg"
+	"github.com/vegidio/umd-lib/pkg"
 )
 
 type Submission struct {
