@@ -8,9 +8,9 @@ import (
 
 // HasHost checks if the host part of the given URL starts with the specified prefix.
 //
-// It returns true if the host starts with the prefix, otherwise false. If the URL is invalid, it prints an error
-// message and returns false.
-func HasHost(urlStr string, prefix string) bool {
+// It returns true if the host ends with the suffix, otherwise false. If the URL is invalid, it prints an error message
+// and returns false.
+func HasHost(urlStr string, suffix string) bool {
 	parsedURL, err := url.Parse(urlStr)
 	if err != nil {
 		fmt.Println("Invalid URL:", err)
@@ -19,5 +19,5 @@ func HasHost(urlStr string, prefix string) bool {
 
 	// Remove port if present
 	host := parsedURL.Hostname()
-	return strings.HasPrefix(host, prefix)
+	return strings.HasSuffix(host, suffix)
 }
