@@ -2,16 +2,15 @@ package umd
 
 import (
 	"fmt"
-	"github.com/vegidio/umd-lib/internal/extractors"
 	"github.com/vegidio/umd-lib/internal/extractors/reddit"
-	"github.com/vegidio/umd-lib/internal/model"
+	"github.com/vegidio/umd-lib/model"
 	"reflect"
 )
 
 type Umd struct {
 	url       string
 	metadata  map[string]interface{}
-	extractor extractors.Extractor
+	extractor model.Extractor
 }
 
 func New(url string, metadata map[string]interface{}, callback func(event model.Event)) (*Umd, error) {
@@ -35,8 +34,8 @@ func (u Umd) QueryMedia(limit int, extensions []string) model.Response {
 
 // region - Private functions
 
-func findExtractor(url string, callback func(event model.Event)) extractors.Extractor {
-	var extractor extractors.Extractor
+func findExtractor(url string, callback func(event model.Event)) model.Extractor {
+	var extractor model.Extractor
 
 	if reddit.IsMatch(url) {
 		extractor = reddit.Reddit{Callback: callback}

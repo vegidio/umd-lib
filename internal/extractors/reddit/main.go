@@ -2,8 +2,7 @@ package reddit
 
 import (
 	"github.com/thoas/go-funk"
-	"github.com/vegidio/umd-lib/internal/extractors"
-	"github.com/vegidio/umd-lib/internal/model"
+	"github.com/vegidio/umd-lib/model"
 	"github.com/vegidio/umd-lib/pkg"
 	"reflect"
 	"regexp"
@@ -11,7 +10,7 @@ import (
 )
 
 type Reddit struct {
-	Callback func(model.Event)
+	Callback func(event model.Event)
 }
 
 func IsMatch(url string) bool {
@@ -42,7 +41,7 @@ func (r Reddit) GetFetch() pkg.Fetch {
 }
 
 // Compile-time assertion to ensure the extractor implements the Extractor interface
-var _ extractors.Extractor = (*Reddit)(nil)
+var _ model.Extractor = (*Reddit)(nil)
 
 // region - Private methods
 
@@ -125,14 +124,11 @@ func submissionsToMedia(submissions []Child, sourceName string, name string) []m
 			url = submission.Data.Url
 		}
 
-		return model.Media{
-			Url: url,
-			Metadata: map[string]interface{}{
-				"source":  sourceName,
-				"name":    name,
-				"created": submission.Data.Created,
-			},
-		}
+		return model.NewMedia(url, map[string]interface{}{
+			"source":  sourceName,
+			"name":    name,
+			"created": submission.Data.Created,
+		})
 	}).([]model.Media)
 }
 
