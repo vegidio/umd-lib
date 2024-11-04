@@ -16,7 +16,7 @@ func main() {
 
 	fmt.Printf("Array: %v\n", newArray)
 
-	umdObj, _ := umd.New("https://www.reddit.com/r/aww/comments/123456", make(map[string]interface{}), nil)
-	resp := umdObj.QueryMedia(10, make([]string, 0))
-	fmt.Printf("Response: %v\n", resp)
+	umdObj, _ := umd.New("https://www.reddit.com/user/atomicbrunette18/", make(map[string]interface{}), nil)
+	resp := umdObj.QueryMedia(100, make([]string, 0))
+	fmt.Printf("Size: %d", len(resp.Media))
 }

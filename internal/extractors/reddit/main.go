@@ -98,7 +98,16 @@ func (r Reddit) fetchSubmissions(source SourceType, limit int, extensions []stri
 		filteredSubmissions := submission.Data.Children
 		after = submission.Data.After
 		amountBefore := len(submissions)
-		submissions = append(submissions, filteredSubmissions...)
+
+		// Append the arrays together, but removing duplicates
+		submissions = funk.UniqBy(append(submissions, filteredSubmissions...), func(c Child) string {
+			url := c.Data.SecureMedia.RedditVideo.FallbackUrl
+			if url == "" {
+				url = c.Data.Url
+			}
+
+			return url
+		}).([]Child)
 
 		if r.Callback != nil {
 			queried := len(submissions) - amountBefore
