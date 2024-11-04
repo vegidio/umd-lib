@@ -110,7 +110,12 @@ func (r Reddit) fetchSubmissions(source SourceType, limit int, extensions []stri
 		}
 	}
 
-	return submissions[:limit]
+	// Limiting the number of results
+	if len(submissions) > limit {
+		submissions = submissions[:limit]
+	}
+
+	return submissions
 }
 
 // endregion
