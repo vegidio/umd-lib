@@ -51,29 +51,30 @@ func (r Reddit) getSourceType(url string) SourceType {
 	regexSubreddit := regexp.MustCompile(`/r/([^/\n]+)`)
 
 	var source SourceType
+	var name string
 
 	if regexSubmission.MatchString(url) {
 		matches := regexSubmission.FindStringSubmatch(url)
-		name := matches[1]
+		name = matches[1]
 		id := matches[2]
 		source = SourceSubmission{Name: name, ID: id}
 	}
 
 	if regexUser.MatchString(url) {
 		matches := regexUser.FindStringSubmatch(url)
-		name := matches[1]
+		name = matches[1]
 		source = SourceUser{Name: name}
 	}
 
 	if regexSubreddit.MatchString(url) {
 		matches := regexSubreddit.FindStringSubmatch(url)
-		name := matches[1]
+		name = matches[1]
 		source = SourceSubreddit{Name: name}
 	}
 
 	if r.Callback != nil {
-		sourceName := strings.TrimPrefix(reflect.TypeOf(source).Name(), "Source")
-		r.Callback(model.OnExtractorTypeFound{Name: sourceName})
+		sourceType := strings.TrimPrefix(reflect.TypeOf(source).Name(), "Source")
+		r.Callback(model.OnExtractorTypeFound{Type: sourceType, Name: name})
 	}
 
 	return source
