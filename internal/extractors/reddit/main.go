@@ -66,15 +66,13 @@ func (r Reddit) getSourceType(url string) (SourceType, error) {
 		name = matches[1]
 		id := matches[2]
 		source = SourceSubmission{Name: name, ID: id}
-	}
 
-	if regexUser.MatchString(url) {
+	} else if regexUser.MatchString(url) {
 		matches := regexUser.FindStringSubmatch(url)
 		name = matches[1]
 		source = SourceUser{Name: name}
-	}
 
-	if regexSubreddit.MatchString(url) {
+	} else if regexSubreddit.MatchString(url) {
 		matches := regexSubreddit.FindStringSubmatch(url)
 		name = matches[1]
 		source = SourceSubreddit{Name: name}

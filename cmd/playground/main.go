@@ -16,7 +16,13 @@ func main() {
 
 	fmt.Printf("Array: %v\n", newArray)
 
-	umdObj, _ := umd.New("https://www.reddit.com/user/atomicbrunette18/", make(map[string]interface{}), nil)
+	umdObj, err := umd.New("https://www.radasdaseddit.com/user/atomicbrunette18/", make(map[string]interface{}), nil)
+
+	if err != nil {
+		fmt.Printf("Error: %v", err)
+		return
+	}
+
 	resp, err := umdObj.QueryMedia(100, make([]string, 0))
 
 	if err != nil {
