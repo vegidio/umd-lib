@@ -17,6 +17,12 @@ func main() {
 	fmt.Printf("Array: %v\n", newArray)
 
 	umdObj, _ := umd.New("https://www.reddit.com/user/atomicbrunette18/", make(map[string]interface{}), nil)
-	resp := umdObj.QueryMedia(100, make([]string, 0))
+	resp, err := umdObj.QueryMedia(100, make([]string, 0))
+
+	if err != nil {
+		fmt.Printf("Error: %v", err)
+		return
+	}
+
 	fmt.Printf("Size: %d", len(resp.Media))
 }

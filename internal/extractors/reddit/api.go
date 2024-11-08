@@ -17,15 +17,21 @@ var client = resty.New().
 //
 // Returns:
 //   - A slice of Submission structs containing the details of the submissions.
-func getSubmission(id string) []Submission {
+func getSubmission(id string) (*Submission, error) {
 	submissions := make([]Submission, 0)
 	url := fmt.Sprintf("comments/%s.json?raw_json=1", id)
 
-	_, _ = client.R().
+	resp, err := client.R().
 		SetResult(&submissions).
 		Get(url)
 
-	return submissions
+	if err != nil {
+		return nil, err
+	} else if resp.IsError() {
+		return nil, fmt.Errorf("error fetching post id '%s' submissions: %s", id, resp.Status())
+	}
+
+	return &submissions[0], nil
 }
 
 // getUserSubmissions retrieves a list of submissions for a given Reddit user.
@@ -40,15 +46,21 @@ func getSubmission(id string) []Submission {
 //
 // Returns:
 //   - A Submission struct containing the details of the submissions.
-func getUserSubmissions(user string, after string, limit int) Submission {
-	var submission Submission
+func getUserSubmissions(user string, after string, limit int) (*Submission, error) {
+	var submission *Submission
 	url := fmt.Sprintf("user/%s/submitted.json?sort=new&raw_json=1&after=%s&limit=%d", user, after, limit)
 
-	_, _ = client.R().
+	resp, err := client.R().
 		SetResult(&submission).
 		Get(url)
 
-	return submission
+	if err != nil {
+		return nil, err
+	} else if resp.IsError() {
+		return nil, fmt.Errorf("error fetching user '%s' submissions: %s", user, resp.Status())
+	}
+
+	return submission, nil
 }
 
 // getSubredditSubmissions retrieves a list of submissions for a given subreddit.
@@ -62,13 +74,19 @@ func getUserSubmissions(user string, after string, limit int) Submission {
 //
 // Returns:
 //   - A Submission struct containing the details of the submissions.
-func getSubredditSubmissions(subreddit string, after string, limit int) Submission {
-	var submission Submission
+func getSubredditSubmissions(subreddit string, after string, limit int) (*Submission, error) {
+	var submission *Submission
 	url := fmt.Sprintf("r/%s/hot.json?raw_json=1&after=%s&limit=%d", subreddit, after, limit)
 
-	_, _ = client.R().
+	resp, err := client.R().
 		SetResult(&submission).
 		Get(url)
 
-	return submission
+	if err != nil {
+		return nil, err
+	} else if resp.IsError() {
+		return nil, fmt.Errorf("error fetching subreddit '%s' submissions: %s", subreddit, resp.Status())
+	}
+
+	return submission, nil
 }

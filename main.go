@@ -28,7 +28,7 @@ func New(url string, metadata map[string]interface{}, callback func(event model.
 	}, nil
 }
 
-func (u Umd) QueryMedia(limit int, extensions []string) model.Response {
+func (u Umd) QueryMedia(limit int, extensions []string) (*model.Response, error) {
 	return u.extractor.QueryMedia(u.url, limit, extensions)
 }
 

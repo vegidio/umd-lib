@@ -1,6 +1,7 @@
 package reddit
 
 import (
+	"fmt"
 	"github.com/thoas/go-funk"
 	"github.com/vegidio/umd-lib/model"
 	"github.com/vegidio/umd-lib/pkg"
@@ -17,9 +18,16 @@ func IsMatch(url string) bool {
 	return pkg.HasHost(url, "reddit.com")
 }
 
-func (r Reddit) QueryMedia(url string, limit int, extensions []string) model.Response {
-	source := r.getSourceType(url)
-	submissions := r.fetchSubmissions(source, limit, extensions)
+func (r Reddit) QueryMedia(url string, limit int, extensions []string) (*model.Response, error) {
+	source, err := r.getSourceType(url)
+	if err != nil {
+		return nil, err
+	}
+
+	submissions, err := r.fetchSubmissions(source, limit, extensions)
+	if err != nil {
+		return nil, err
+	}
 
 	sourceName := strings.TrimPrefix(reflect.TypeOf(source).Name(), "Source")
 	media := submissionsToMedia(submissions, sourceName, url)
@@ -28,12 +36,12 @@ func (r Reddit) QueryMedia(url string, limit int, extensions []string) model.Res
 		r.Callback(model.OnQueryCompleted{Total: len(media)})
 	}
 
-	return model.Response{
+	return &model.Response{
 		Url:       url,
 		Media:     media,
 		Extractor: model.Reddit,
 		Metadata:  map[string]interface{}{},
-	}
+	}, nil
 }
 
 func (r Reddit) GetFetch() pkg.Fetch {
@@ -45,7 +53,7 @@ var _ model.Extractor = (*Reddit)(nil)
 
 // region - Private methods
 
-func (r Reddit) getSourceType(url string) SourceType {
+func (r Reddit) getSourceType(url string) (SourceType, error) {
 	regexSubmission := regexp.MustCompile(`/(?:r|u|user)/([^/?]+)/comments/([^/\n?]+)`)
 	regexUser := regexp.MustCompile(`/(?:u|user)/([^/\n?]+)`)
 	regexSubreddit := regexp.MustCompile(`/r/([^/\n]+)`)
@@ -72,28 +80,37 @@ func (r Reddit) getSourceType(url string) SourceType {
 		source = SourceSubreddit{Name: name}
 	}
 
+	if source == nil {
+		return nil, fmt.Errorf("source type not found for URL: %s", url)
+	}
+
 	if r.Callback != nil {
 		sourceType := strings.TrimPrefix(reflect.TypeOf(source).Name(), "Source")
 		r.Callback(model.OnExtractorTypeFound{Type: sourceType, Name: name})
 	}
 
-	return source
+	return source, nil
 }
 
-func (r Reddit) fetchSubmissions(source SourceType, limit int, extensions []string) []Child {
+func (r Reddit) fetchSubmissions(source SourceType, limit int, extensions []string) ([]Child, error) {
 	submissions := make([]Child, 0)
 	after := ""
 
 	for {
-		var submission Submission
+		var submission *Submission
+		var err error
 
 		switch s := source.(type) {
 		case SourceSubmission:
-			submission = getSubmission(s.ID)[0]
+			submission, err = getSubmission(s.ID)
 		case SourceUser:
-			submission = getUserSubmissions(s.Name, after, limit)
+			submission, err = getUserSubmissions(s.Name, after, limit)
 		case SourceSubreddit:
-			submission = getSubredditSubmissions(s.Name, after, limit)
+			submission, err = getSubredditSubmissions(s.Name, after, limit)
+		}
+
+		if err != nil {
+			return make([]Child, 0), err
 		}
 
 		filteredSubmissions := submission.Data.Children
@@ -125,7 +142,7 @@ func (r Reddit) fetchSubmissions(source SourceType, limit int, extensions []stri
 		submissions = submissions[:limit]
 	}
 
-	return submissions
+	return submissions, nil
 }
 
 // endregion
