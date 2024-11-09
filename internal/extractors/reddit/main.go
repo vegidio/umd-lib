@@ -3,19 +3,21 @@ package reddit
 import (
 	"fmt"
 	"github.com/thoas/go-funk"
-	"github.com/vegidio/umd-lib/model"
-	"github.com/vegidio/umd-lib/pkg"
+	"github.com/vegidio/umd-lib/event"
+	"github.com/vegidio/umd-lib/fetch"
+	"github.com/vegidio/umd-lib/internal"
+	"github.com/vegidio/umd-lib/internal/model"
 	"reflect"
 	"regexp"
 	"strings"
 )
 
 type Reddit struct {
-	Callback func(event model.Event)
+	Callback func(event event.Event)
 }
 
 func IsMatch(url string) bool {
-	return pkg.HasHost(url, "reddit.com")
+	return internal.HasHost(url, "reddit.com")
 }
 
 func (r Reddit) QueryMedia(url string, limit int, extensions []string) (*model.Response, error) {
@@ -33,7 +35,7 @@ func (r Reddit) QueryMedia(url string, limit int, extensions []string) (*model.R
 	media := submissionsToMedia(submissions, sourceName, url)
 
 	if r.Callback != nil {
-		r.Callback(model.OnQueryCompleted{Total: len(media)})
+		r.Callback(event.OnQueryCompleted{Total: len(media)})
 	}
 
 	return &model.Response{
@@ -44,8 +46,8 @@ func (r Reddit) QueryMedia(url string, limit int, extensions []string) (*model.R
 	}, nil
 }
 
-func (r Reddit) GetFetch() pkg.Fetch {
-	return pkg.Fetch{}
+func (r Reddit) GetFetch() fetch.Fetch {
+	return fetch.New(make(map[string]string), 0)
 }
 
 // Compile-time assertion to ensure the extractor implements the Extractor interface
@@ -84,7 +86,7 @@ func (r Reddit) getSourceType(url string) (SourceType, error) {
 
 	if r.Callback != nil {
 		sourceType := strings.TrimPrefix(reflect.TypeOf(source).Name(), "Source")
-		r.Callback(model.OnExtractorTypeFound{Type: sourceType, Name: name})
+		r.Callback(event.OnExtractorTypeFound{Type: sourceType, Name: name})
 	}
 
 	return source, nil
@@ -127,7 +129,7 @@ func (r Reddit) fetchSubmissions(source SourceType, limit int, extensions []stri
 
 		if r.Callback != nil {
 			queried := len(submissions) - amountBefore
-			r.Callback(model.OnMediaQueried{Amount: queried})
+			r.Callback(event.OnMediaQueried{Amount: queried})
 		}
 
 		if len(submission.Data.Children) == 0 || len(submissions) >= limit || after == "" {
@@ -157,7 +159,7 @@ func submissionsToMedia(submissions []Child, sourceName string, name string) []m
 		return model.NewMedia(url, map[string]interface{}{
 			"source":  sourceName,
 			"name":    name,
-			"created": submission.Data.Created,
+			"created": submission.Data.Created.Time,
 		})
 	}).([]model.Media)
 }

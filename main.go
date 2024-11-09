@@ -2,8 +2,10 @@ package umd
 
 import (
 	"fmt"
+	"github.com/vegidio/umd-lib/event"
+	"github.com/vegidio/umd-lib/fetch"
 	"github.com/vegidio/umd-lib/internal/extractors/reddit"
-	"github.com/vegidio/umd-lib/model"
+	"github.com/vegidio/umd-lib/internal/model"
 	"reflect"
 )
 
@@ -13,7 +15,7 @@ type Umd struct {
 	extractor model.Extractor
 }
 
-func New(url string, metadata map[string]interface{}, callback func(event model.Event)) (*Umd, error) {
+func New(url string, metadata map[string]interface{}, callback func(event event.Event)) (*Umd, error) {
 	extractor := findExtractor(url, callback)
 
 	// throw an error if no extractor was found
@@ -28,13 +30,17 @@ func New(url string, metadata map[string]interface{}, callback func(event model.
 	}, nil
 }
 
-func (u Umd) QueryMedia(limit int, extensions []string) (*model.Response, error) {
+func (u Umd) QueryMedia(limit int, extensions []string) (*Response, error) {
 	return u.extractor.QueryMedia(u.url, limit, extensions)
+}
+
+func (u Umd) GetFetch() fetch.Fetch {
+	return u.extractor.GetFetch()
 }
 
 // region - Private functions
 
-func findExtractor(url string, callback func(event model.Event)) model.Extractor {
+func findExtractor(url string, callback func(event event.Event)) model.Extractor {
 	var extractor model.Extractor
 
 	if reddit.IsMatch(url) {
@@ -43,7 +49,7 @@ func findExtractor(url string, callback func(event model.Event)) model.Extractor
 
 	if callback != nil && extractor != nil {
 		name := reflect.TypeOf(extractor).Name()
-		callback(model.OnExtractorFound{Name: name})
+		callback(event.OnExtractorFound{Name: name})
 	}
 
 	return extractor

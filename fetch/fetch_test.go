@@ -1,4 +1,4 @@
-package pkg
+package fetch
 
 import (
 	"github.com/stretchr/testify/assert"
@@ -15,7 +15,7 @@ func TestFetch_GetText(t *testing.T) {
 
 	defer server.Close()
 
-	fetch := NewFetch(nil, 0)
+	fetch := New(nil, 0)
 	body, err := fetch.GetText(server.URL)
 
 	assert.NoError(t, err)
@@ -23,7 +23,7 @@ func TestFetch_GetText(t *testing.T) {
 }
 
 func TestFetch_GetText_Error(t *testing.T) {
-	fetch := NewFetch(nil, 0)
+	fetch := New(nil, 0)
 	_, err := fetch.GetText("http://invalid-url")
 
 	assert.Error(t, err)
@@ -37,7 +37,7 @@ func TestFetch_DownloadFile(t *testing.T) {
 
 	defer server.Close()
 
-	fetch := NewFetch(nil, 0)
+	fetch := New(nil, 0)
 	filePath := "testfile.txt"
 	size, err := fetch.DownloadFile(server.URL, filePath)
 
@@ -46,7 +46,7 @@ func TestFetch_DownloadFile(t *testing.T) {
 }
 
 func TestFetch_DownloadFile_Error(t *testing.T) {
-	fetch := NewFetch(nil, 0)
+	fetch := New(nil, 0)
 	_, err := fetch.DownloadFile("http://invalid-url", "testfile.txt")
 
 	assert.Error(t, err)

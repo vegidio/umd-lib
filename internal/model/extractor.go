@@ -1,7 +1,7 @@
 package model
 
 import (
-	"github.com/vegidio/umd-lib/pkg"
+	"github.com/vegidio/umd-lib/fetch"
 )
 
 // Extractor defines the interface for extractors.
@@ -10,5 +10,5 @@ type Extractor interface {
 	QueryMedia(url string, limit int, extensions []string) (*Response, error)
 
 	// GetFetch returns the Fetch instance used by this extractor.
-	GetFetch() pkg.Fetch
+	GetFetch() fetch.Fetch
 }

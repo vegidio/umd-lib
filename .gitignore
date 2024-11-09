@@ -166,4 +166,4 @@ Temporary Items
 *.icloud
 
 # Test
-pkg/testfile.txt
+testfile.txt

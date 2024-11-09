@@ -1,4 +1,4 @@
-package pkg
+package fetch
 
 import (
 	"fmt"
@@ -13,12 +13,12 @@ type Fetch struct {
 
 // region
 
-// NewFetch creates a new Fetch instance with specified headers and retry settings.
+// New creates a new Fetch instance with specified headers and retry settings.
 //
 // Parameters:
 //   - headers: a map of headers to be set on each request.
 //   - retries: the number of retry attempts for failed requests.
-func NewFetch(headers map[string]string, retries int) Fetch {
+func New(headers map[string]string, retries int) Fetch {
 	return Fetch{
 		client: resty.New().
 			SetHeaders(headers).

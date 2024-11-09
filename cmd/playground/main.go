@@ -16,7 +16,7 @@ func main() {
 
 	fmt.Printf("Array: %v\n", newArray)
 
-	umdObj, err := umd.New("https://www.radasdaseddit.com/user/atomicbrunette18/", make(map[string]interface{}), nil)
+	umdObj, err := umd.New("https://www.reddit.com/user/yourwebgf/", make(map[string]interface{}), nil)
 
 	if err != nil {
 		fmt.Printf("Error: %v", err)
