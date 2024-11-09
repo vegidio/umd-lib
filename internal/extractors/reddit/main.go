@@ -32,7 +32,8 @@ func (r Reddit) QueryMedia(url string, limit int, extensions []string) (*model.R
 	}
 
 	sourceName := strings.TrimPrefix(reflect.TypeOf(source).Name(), "Source")
-	media := submissionsToMedia(submissions, sourceName, url)
+	name := reflect.ValueOf(source).FieldByName("Name").String()
+	media := submissionsToMedia(submissions, sourceName, name)
 
 	if r.Callback != nil {
 		r.Callback(event.OnQueryCompleted{Total: len(media)})

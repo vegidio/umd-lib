@@ -30,5 +30,5 @@ func main() {
 		return
 	}
 
-	fmt.Printf("Size: %d", len(resp.Media))
+	fmt.Printf("Media: %v", resp.Media)
 }
