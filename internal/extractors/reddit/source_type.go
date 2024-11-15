@@ -9,7 +9,7 @@ type SourceType interface {
 // SourceSubmission represents a submission source type.
 type SourceSubmission struct {
 	Name string
-	ID   string
+	Id   string
 }
 
 // isSourceType implements the SourceType interface for Submission.

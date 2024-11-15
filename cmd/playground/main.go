@@ -2,33 +2,15 @@ package main
 
 import (
 	"fmt"
-	"github.com/thoas/go-funk"
 	"github.com/vegidio/umd-lib"
+	"github.com/vegidio/umd-lib/event"
 )
 
 func main() {
-	array := []int{1, 2, 3, 4, 5, 6}
-	filter := []int{1, 2}
-
-	newArray := funk.FilterInt(array, func(value int) bool {
-		return !funk.ContainsInt(filter, value)
+	umdObj, _ := umd.New("https://www.redgifs.com/watch/liquidlostgoldfish", nil, func(event event.Event) {
+		fmt.Printf("Event: %v\n", event)
 	})
 
-	fmt.Printf("Array: %v\n", newArray)
-
-	umdObj, err := umd.New("https://www.reddit.com/user/yourwebgf/", make(map[string]interface{}), nil)
-
-	if err != nil {
-		fmt.Printf("Error: %v", err)
-		return
-	}
-
-	resp, err := umdObj.QueryMedia(100, make([]string, 0))
-
-	if err != nil {
-		fmt.Printf("Error: %v", err)
-		return
-	}
-
-	fmt.Printf("Media: %v", resp.Media)
+	resp, _ := umdObj.QueryMedia(100, make([]string, 0))
+	fmt.Printf("Response: %v\n", resp)
 }

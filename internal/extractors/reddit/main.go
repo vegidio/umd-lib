@@ -64,18 +64,19 @@ func (r Reddit) getSourceType(url string) (SourceType, error) {
 	var source SourceType
 	var name string
 
-	if regexSubmission.MatchString(url) {
+	switch {
+	case regexSubmission.MatchString(url):
 		matches := regexSubmission.FindStringSubmatch(url)
 		name = matches[1]
 		id := matches[2]
-		source = SourceSubmission{Name: name, ID: id}
+		source = SourceSubmission{Name: name, Id: id}
 
-	} else if regexUser.MatchString(url) {
+	case regexUser.MatchString(url):
 		matches := regexUser.FindStringSubmatch(url)
 		name = matches[1]
 		source = SourceUser{Name: name}
 
-	} else if regexSubreddit.MatchString(url) {
+	case regexSubreddit.MatchString(url):
 		matches := regexSubreddit.FindStringSubmatch(url)
 		name = matches[1]
 		source = SourceSubreddit{Name: name}
@@ -103,7 +104,7 @@ func (r Reddit) fetchSubmissions(source SourceType, limit int, extensions []stri
 
 		switch s := source.(type) {
 		case SourceSubmission:
-			submission, err = getSubmission(s.ID)
+			submission, err = getSubmission(s.Id)
 		case SourceUser:
 			submission, err = getUserSubmissions(s.Name, after, limit)
 		case SourceSubreddit:

@@ -12,10 +12,10 @@ var client = resty.New().
 //
 // Example: https://www.reddit.com/comments/1bxsmnr.json?raw_json=1, where <1bxsmnr> is the ID.
 //
-// Parameters:
+// # Parameters:
 //   - id: The ID of the Reddit post.
 //
-// Returns:
+// # Returns:
 //   - A slice of Submission structs containing the details of the submissions.
 func getSubmission(id string) (*Submission, error) {
 	submissions := make([]Submission, 0)
@@ -39,12 +39,12 @@ func getSubmission(id string) (*Submission, error) {
 // Example: https://www.reddit.com/user/atomicbrunette18/submitted.json?sort=new&raw_json=1&after=&limit=100, where
 // <atomicbrunette18> is the username.
 //
-// Parameters:
+// # Parameters:
 //   - user: The username of the Reddit user.
 //   - after: The ID of the last submission to start after (for pagination).
 //   - limit: The maximum number of submissions to retrieve.
 //
-// Returns:
+// # Returns:
 //   - A Submission struct containing the details of the submissions.
 func getUserSubmissions(user string, after string, limit int) (*Submission, error) {
 	var submission *Submission
@@ -67,12 +67,12 @@ func getUserSubmissions(user string, after string, limit int) (*Submission, erro
 //
 // Example: https://www.reddit.com/r/nsfw/hot.json?raw_json=1&after=&limit=100, where <nsfw> is the subreddit name.
 //
-// Parameters:
+// # Parameters:
 //   - subreddit: The name of the subreddit.
 //   - after: The ID of the last submission to start after (for pagination).
 //   - limit: The maximum number of submissions to retrieve.
 //
-// Returns:
+// # Returns:
 //   - A Submission struct containing the details of the submissions.
 func getSubredditSubmissions(subreddit string, after string, limit int) (*Submission, error) {
 	var submission *Submission
