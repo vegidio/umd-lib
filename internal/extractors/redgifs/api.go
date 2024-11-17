@@ -1,56 +1,60 @@
 package redgifs
 
 import (
+	"encoding/json"
 	"fmt"
-	"github.com/go-resty/resty/v2"
+	"github.com/PuerkitoBio/goquery"
+	"github.com/vegidio/umd-lib/fetch"
+	"strings"
+	"time"
 )
 
-var client = resty.New().
-	SetBaseURL("https://api.redgifs.com/")
+var f = fetch.New(nil, 0)
 
-func getToken() (*Auth, error) {
-	var auth *Auth
-	url := "v2/auth/temporary"
-	headers := map[string]string{
-		"Content-Type": "application/json",
-		"Origin":       "https://www.redgifs.com",
-		"Referer":      "https://www.redgifs.com/",
-		"User-Agent":   "UMD",
-	}
-
-	resp, err := client.R().
-		SetHeaders(headers).
-		SetResult(&auth).
-		Get(url)
-
+func getVideo(videoId string) (*Video, error) {
+	html, err := f.GetText(fmt.Sprintf("https://www.redgifs.com/watch/%s", videoId))
 	if err != nil {
 		return nil, err
-	} else if resp.IsError() {
-		return nil, fmt.Errorf("error fetching authorization token: %s", resp.Status())
 	}
 
-	return auth, nil
+	doc, err := goquery.NewDocumentFromReader(strings.NewReader(html))
+	if err != nil {
+		return nil, err
+	}
+
+	var result map[string]interface{}
+	jsonString := doc.Find("script[type='application/ld+json']").Text()
+	err = json.Unmarshal([]byte(jsonString), &result)
+	if err != nil {
+		return nil, err
+	}
+
+	video := result["video"].(map[string]interface{})
+	file := strings.ReplaceAll(lastRightOf(video["contentUrl"].(string), "/"), "-silent", "")
+
+	return &Video{
+		Author:  video["author"].(string),
+		Url:     fmt.Sprintf("https://files.redgifs.com/%s", file),
+		Created: parseCustomDateTime(video["uploadDate"].(string)),
+	}, nil
 }
 
-func getVideo(token string, videoUrl string, videoId string) (*Video, error) {
-	var watch *Video
-	url := fmt.Sprintf("v2/gifs/%s?views=yes", videoId)
-	headers := map[string]string{
-		"Authorization":  token,
-		"X-CustomHeader": videoUrl,
-		"User-Agent":     "UMD",
+func lastRightOf(s string, substring string) string {
+	lastSlashIndex := strings.LastIndex(s, substring)
+	if lastSlashIndex == -1 {
+		return s
 	}
 
-	resp, err := client.R().
-		SetHeaders(headers).
-		SetResult(&watch).
-		Get(url)
+	return s[lastSlashIndex+1:]
+}
 
+func parseCustomDateTime(input string) time.Time {
+	var year, month, day, hour int
+
+	_, err := fmt.Sscanf(input, "%%%d-%%%d-%%%dUTC%%%d:", &year, &month, &day, &hour)
 	if err != nil {
-		return nil, err
-	} else if resp.IsError() {
-		return nil, fmt.Errorf("error fetching video ID '%s': %s", videoId, resp.Status())
+		return time.Now()
 	}
 
-	return watch, nil
+	return time.Date(year, time.Month(month), day, hour, 0, 0, 0, time.UTC)
 }
