@@ -2,13 +2,14 @@ package umd
 
 import (
 	"fmt"
-	"github.com/thoas/go-funk"
 	"github.com/vegidio/umd-lib/event"
 	"github.com/vegidio/umd-lib/fetch"
 	"github.com/vegidio/umd-lib/internal/extractors/reddit"
 	"github.com/vegidio/umd-lib/internal/extractors/redgifs"
 	"github.com/vegidio/umd-lib/internal/model"
+	"github.com/vegidio/umd-lib/internal/utils"
 	"reflect"
+	"sync"
 )
 
 // Umd represents a Universal Media Downloader instance.
@@ -88,7 +89,7 @@ func findExtractor(url string, metadata model.Metadata, callback func(event even
 	extractor.SetExternal(External{})
 
 	if callback != nil {
-		name := reflect.TypeOf(extractor).Name()
+		name := utils.LastRightOf(reflect.TypeOf(extractor).String(), ".")
 		callback(event.OnExtractorFound{Name: name})
 	}
 
@@ -97,32 +98,56 @@ func findExtractor(url string, metadata model.Metadata, callback func(event even
 
 type External struct{}
 
-func (External) ExpandMedia(media []model.Media, metadata *model.Metadata) []model.Media {
-	return funk.Map(media, func(m model.Media) model.Media {
-		if m.Type == model.Unknown {
-			uObj, err := New(m.Url, *metadata, nil)
-			if err != nil {
-				return m
+func (External) ExpandMedia(media []model.Media, metadata *model.Metadata, parallel int) []model.Media {
+	result := make([]model.Media, len(media))
+
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+	sem := make(chan struct{}, parallel)
+
+	for _, m := range media {
+		wg.Add(1)
+
+		go func(current Media) {
+			defer wg.Done()
+			sem <- struct{}{}
+
+			if current.Type == model.Unknown {
+				uObj, err := New(current.Url, *metadata, nil)
+				if err != nil {
+					result = append(result, current)
+					return
+				}
+
+				resp, err := uObj.QueryMedia(1, make([]string, 0), false)
+				if err != nil {
+					result = append(result, current)
+					return
+				}
+
+				_, exists := (*metadata)[resp.Extractor]
+				if !exists {
+					mu.Lock()
+					(*metadata)[resp.Extractor] = make(map[string]interface{})
+					(*metadata)[resp.Extractor] = resp.Metadata[resp.Extractor]
+					mu.Unlock()
+				}
+
+				if len(resp.Media) > 0 {
+					result = append(result, resp.Media[0])
+					return
+				}
 			}
 
-			resp, err := uObj.QueryMedia(1, make([]string, 0), false)
-			if err != nil {
-				return m
-			}
+			result = append(result, current)
+			<-sem
+		}(m)
+	}
 
-			_, exists := (*metadata)[resp.Extractor]
-			if !exists {
-				(*metadata)[resp.Extractor] = make(map[string]interface{})
-				(*metadata)[resp.Extractor] = resp.Metadata[resp.Extractor]
-			}
+	wg.Wait()
+	close(sem)
 
-			if len(resp.Media) > 0 {
-				return resp.Media[0]
-			}
-		}
-
-		return m
-	}).([]model.Media)
+	return result
 }
 
 // endregion

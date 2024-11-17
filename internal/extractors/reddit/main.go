@@ -130,7 +130,7 @@ func (r *Reddit) fetchMedia(source SourceType, limit int, extensions []string, d
 		newMedia := submissionsToMedia(submission.Data.Children, sourceName, name)
 
 		if deep {
-			newMedia = r.external.ExpandMedia(newMedia, &r.responseMetadata)
+			newMedia = r.external.ExpandMedia(newMedia, &r.responseMetadata, 5)
 		}
 
 		media, amountQueried = utils.MergeMedia(media, newMedia)

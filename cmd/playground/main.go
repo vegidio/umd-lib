@@ -1,12 +1,20 @@
 package main
 
 import (
+	"fmt"
 	"github.com/vegidio/umd-lib"
-	"log/slog"
 )
 
 func main() {
-	umdObj, _ := umd.New("https://www.reddit.com/user/atomicbrunette18/", nil, nil)
-	resp, _ := umdObj.QueryMedia(10, make([]string, 0), true)
-	slog.Debug("Response:", resp)
+	umdObj, err := umd.New("https://www.reddit.com/user/atomicbrunette18/", nil, nil)
+	if err != nil {
+		fmt.Println("Error:", err)
+	}
+
+	resp, err := umdObj.QueryMedia(99_999, make([]string, 0), true)
+	if err != nil {
+		fmt.Println("Error:", err)
+	}
+
+	fmt.Println("Response:", resp.Media)
 }

@@ -137,8 +137,10 @@ func (r *Redgifs) fetchVideo(source SourceVideo) ([]Video, error) {
 func videosToMedia(videos []Video, sourceName string, id string) []model.Media {
 	return funk.Map(videos, func(video Video) model.Media {
 		return model.NewMedia(video.Url, model.RedGifs, map[string]interface{}{
-			"source": sourceName,
-			"id":     id,
+			"author":  video.Author,
+			"created": video.Created,
+			"source":  sourceName,
+			"id":      id,
 		})
 	}).([]model.Media)
 }

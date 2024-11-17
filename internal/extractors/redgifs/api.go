@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/PuerkitoBio/goquery"
 	"github.com/vegidio/umd-lib/fetch"
+	"github.com/vegidio/umd-lib/internal/utils"
 	"strings"
 	"time"
 )
@@ -30,22 +31,13 @@ func getVideo(videoId string) (*Video, error) {
 	}
 
 	video := result["video"].(map[string]interface{})
-	file := strings.ReplaceAll(lastRightOf(video["contentUrl"].(string), "/"), "-silent", "")
+	file := strings.ReplaceAll(utils.LastRightOf(video["contentUrl"].(string), "/"), "-silent", "")
 
 	return &Video{
 		Author:  video["author"].(string),
 		Url:     fmt.Sprintf("https://files.redgifs.com/%s", file),
 		Created: parseCustomDateTime(video["uploadDate"].(string)),
 	}, nil
-}
-
-func lastRightOf(s string, substring string) string {
-	lastSlashIndex := strings.LastIndex(s, substring)
-	if lastSlashIndex == -1 {
-		return s
-	}
-
-	return s[lastSlashIndex+1:]
 }
 
 func parseCustomDateTime(input string) time.Time {

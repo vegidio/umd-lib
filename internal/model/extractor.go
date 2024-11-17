@@ -5,7 +5,7 @@ import (
 )
 
 type External interface {
-	ExpandMedia(media []Media, metadata *Metadata) []Media
+	ExpandMedia(media []Media, metadata *Metadata, parallel int) []Media
 }
 
 // Extractor defines the interface for extractors.
