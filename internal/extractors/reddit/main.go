@@ -5,35 +5,39 @@ import (
 	"github.com/thoas/go-funk"
 	"github.com/vegidio/umd-lib/event"
 	"github.com/vegidio/umd-lib/fetch"
-	"github.com/vegidio/umd-lib/internal"
 	"github.com/vegidio/umd-lib/internal/model"
+	"github.com/vegidio/umd-lib/internal/utils"
 	"reflect"
 	"regexp"
 	"strings"
 )
 
 type Reddit struct {
+	Metadata model.Metadata
 	Callback func(event event.Event)
+
+	responseMetadata model.Metadata
+	external         model.External
 }
 
 func IsMatch(url string) bool {
-	return internal.HasHost(url, "reddit.com")
+	return utils.HasHost(url, "reddit.com")
 }
 
-func (r Reddit) QueryMedia(url string, limit int, extensions []string) (*model.Response, error) {
+func (r *Reddit) QueryMedia(url string, limit int, extensions []string, deep bool) (*model.Response, error) {
+	if r.responseMetadata == nil {
+		r.responseMetadata = make(model.Metadata)
+	}
+
 	source, err := r.getSourceType(url)
 	if err != nil {
 		return nil, err
 	}
 
-	submissions, err := r.fetchSubmissions(source, limit, extensions)
+	media, err := r.fetchMedia(source, limit, extensions, deep)
 	if err != nil {
 		return nil, err
 	}
-
-	sourceName := strings.TrimPrefix(reflect.TypeOf(source).Name(), "Source")
-	name := reflect.ValueOf(source).FieldByName("Name").String()
-	media := submissionsToMedia(submissions, sourceName, name)
 
 	if r.Callback != nil {
 		r.Callback(event.OnQueryCompleted{Total: len(media)})
@@ -43,12 +47,16 @@ func (r Reddit) QueryMedia(url string, limit int, extensions []string) (*model.R
 		Url:       url,
 		Media:     media,
 		Extractor: model.Reddit,
-		Metadata:  map[string]interface{}{},
+		Metadata:  r.responseMetadata,
 	}, nil
 }
 
-func (r Reddit) GetFetch() fetch.Fetch {
+func (r *Reddit) GetFetch() fetch.Fetch {
 	return fetch.New(make(map[string]string), 0)
+}
+
+func (r *Reddit) SetExternal(external model.External) {
+	r.external = external
 }
 
 // Compile-time assertion to ensure the extractor implements the Extractor interface
@@ -56,7 +64,7 @@ var _ model.Extractor = (*Reddit)(nil)
 
 // region - Private methods
 
-func (r Reddit) getSourceType(url string) (SourceType, error) {
+func (r *Reddit) getSourceType(url string) (SourceType, error) {
 	regexSubmission := regexp.MustCompile(`/(?:r|u|user)/([^/?]+)/comments/([^/\n?]+)`)
 	regexUser := regexp.MustCompile(`/(?:u|user)/([^/\n?]+)`)
 	regexSubreddit := regexp.MustCompile(`/r/([^/\n]+)`)
@@ -94,9 +102,13 @@ func (r Reddit) getSourceType(url string) (SourceType, error) {
 	return source, nil
 }
 
-func (r Reddit) fetchSubmissions(source SourceType, limit int, extensions []string) ([]Child, error) {
-	submissions := make([]Child, 0)
+func (r *Reddit) fetchMedia(source SourceType, limit int, extensions []string, deep bool) ([]model.Media, error) {
+	media := make([]model.Media, 0)
+	amountQueried := 0
 	after := ""
+
+	sourceName := strings.TrimPrefix(reflect.TypeOf(source).Name(), "Source")
+	name := reflect.ValueOf(source).FieldByName("Name").String()
 
 	for {
 		var submission *Submission
@@ -112,39 +124,33 @@ func (r Reddit) fetchSubmissions(source SourceType, limit int, extensions []stri
 		}
 
 		if err != nil {
-			return make([]Child, 0), err
+			return media, err
 		}
 
-		filteredSubmissions := submission.Data.Children
-		after = submission.Data.After
-		amountBefore := len(submissions)
+		newMedia := submissionsToMedia(submission.Data.Children, sourceName, name)
 
-		// Append the arrays together, but removing duplicates
-		submissions = funk.UniqBy(append(submissions, filteredSubmissions...), func(c Child) string {
-			url := c.Data.SecureMedia.RedditVideo.FallbackUrl
-			if url == "" {
-				url = c.Data.Url
-			}
+		if deep {
+			newMedia = r.external.ExpandMedia(newMedia, &r.responseMetadata)
+		}
 
-			return url
-		}).([]Child)
+		media, amountQueried = utils.MergeMedia(media, newMedia)
 
 		if r.Callback != nil {
-			queried := len(submissions) - amountBefore
-			r.Callback(event.OnMediaQueried{Amount: queried})
+			r.Callback(event.OnMediaQueried{Amount: amountQueried})
 		}
 
-		if len(submission.Data.Children) == 0 || len(submissions) >= limit || after == "" {
+		after = submission.Data.After
+		if len(newMedia) == 0 || len(media) >= limit || after == "" {
 			break
 		}
 	}
 
 	// Limiting the number of results
-	if len(submissions) > limit {
-		submissions = submissions[:limit]
+	if len(media) > limit {
+		media = media[:limit]
 	}
 
-	return submissions, nil
+	return media, nil
 }
 
 // endregion
@@ -158,7 +164,7 @@ func submissionsToMedia(submissions []Child, sourceName string, name string) []m
 			url = submission.Data.Url
 		}
 
-		return model.NewMedia(url, map[string]interface{}{
+		return model.NewMedia(url, model.Reddit, map[string]interface{}{
 			"source":  sourceName,
 			"name":    name,
 			"created": submission.Data.Created.Time,

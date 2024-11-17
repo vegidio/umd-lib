@@ -3,14 +3,10 @@ package main
 import (
 	"fmt"
 	"github.com/vegidio/umd-lib"
-	"github.com/vegidio/umd-lib/event"
 )
 
 func main() {
-	umdObj, _ := umd.New("https://www.redgifs.com/watch/liquidlostgoldfish", nil, func(event event.Event) {
-		fmt.Printf("Event: %v\n", event)
-	})
-
-	resp, _ := umdObj.QueryMedia(100, make([]string, 0))
-	fmt.Printf("Response: %v\n", resp)
+	umdObj, _ := umd.New("https://www.reddit.com/user/atomicbrunette18/", nil, nil)
+	resp, _ := umdObj.QueryMedia(10, make([]string, 0), true)
+	fmt.Printf("Response: %v\n", resp.Media)
 }

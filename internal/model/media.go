@@ -17,22 +17,25 @@ type Media struct {
 	// Type is the type of media, determined based on the file extension.
 	Type MediaType
 
+	// Extractor is the extractor used to fetch the media.
+	Extractor ExtractorType
+
 	// Metadata contains metadata about the media. Default is an empty map.
 	Metadata map[string]interface{}
 }
 
 func (m Media) String() string {
-	return fmt.Sprintf("{Url: %s, Extension: %s, Type: %s, Metadata: %v}",
-		m.Url, m.Extension, m.Type, m.Metadata)
+	return fmt.Sprintf("{Url: %s, Extension: %s, Type: %s, Extractor: %s, Metadata: %v}",
+		m.Url, m.Extension, m.Type, m.Extractor, m.Metadata)
 }
 
-func NewMedia(url string, metadata map[string]interface{}) Media {
+func NewMedia(url string, extractor ExtractorType, metadata map[string]interface{}) Media {
 	if metadata == nil {
 		metadata = make(map[string]interface{})
 	}
 
 	extension := getExtension(url)
-	return Media{Url: url, Extension: extension, Type: getType(extension), Metadata: metadata}
+	return Media{Url: url, Extension: extension, Type: getType(extension), Extractor: extractor, Metadata: metadata}
 }
 
 // region - Private functions

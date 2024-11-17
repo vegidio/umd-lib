@@ -14,7 +14,7 @@ type Response struct {
 	Extractor ExtractorType
 
 	// Metadata contains additional metadata about the response.
-	Metadata map[string]interface{}
+	Metadata Metadata
 }
 
 func (r Response) String() string {

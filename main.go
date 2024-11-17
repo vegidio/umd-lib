@@ -2,6 +2,7 @@ package umd
 
 import (
 	"fmt"
+	"github.com/thoas/go-funk"
 	"github.com/vegidio/umd-lib/event"
 	"github.com/vegidio/umd-lib/fetch"
 	"github.com/vegidio/umd-lib/internal/extractors/reddit"
@@ -30,11 +31,14 @@ type Umd struct {
 //   - *Umd - A pointer to the newly created Umd instance.
 //   - error - An error if no extractor is found for the given URL.
 func New(url string, metadata model.Metadata, callback func(event event.Event)) (*Umd, error) {
-	extractor := findExtractor(url, metadata, callback)
+	extractor, err := findExtractor(url, metadata, callback)
 
-	// throw an error if no extractor was found
-	if extractor == nil {
-		return nil, fmt.Errorf("no extractor found for URL: %s", url)
+	if err != nil {
+		return nil, err
+	}
+
+	if metadata == nil {
+		metadata = make(model.Metadata)
 	}
 
 	return &Umd{
@@ -53,8 +57,8 @@ func New(url string, metadata model.Metadata, callback func(event event.Event)) 
 // # Returns:
 //   - *Response - A pointer to the response containing the queried media.
 //   - error - An error if the query fails.
-func (u Umd) QueryMedia(limit int, extensions []string) (*Response, error) {
-	return u.extractor.QueryMedia(u.url, limit, extensions)
+func (u Umd) QueryMedia(limit int, extensions []string, deep bool) (*Response, error) {
+	return u.extractor.QueryMedia(u.url, limit, extensions, deep)
 }
 
 // GetFetch returns the fetch.Fetch instance associated with the extractor.
@@ -67,32 +71,58 @@ func (u Umd) GetFetch() fetch.Fetch {
 
 // region - Private functions
 
-func findExtractor(url string, metadata model.Metadata, callback func(event event.Event)) model.Extractor {
+func findExtractor(url string, metadata model.Metadata, callback func(event event.Event)) (model.Extractor, error) {
 	var extractor model.Extractor
 
 	switch {
 	case reddit.IsMatch(url):
-		extractor = reddit.Reddit{Callback: callback}
+		extractor = &reddit.Reddit{Metadata: metadata, Callback: callback}
 	case redgifs.IsMatch(url):
-		data := getMetadata(metadata, model.RedGifs)
-		extractor = &redgifs.Redgifs{Metadata: data, Callback: callback}
+		extractor = &redgifs.Redgifs{Metadata: metadata, Callback: callback}
 	}
 
-	if callback != nil && extractor != nil {
+	if extractor == nil {
+		return nil, fmt.Errorf("no extractor found for URL: %s", url)
+	}
+
+	extractor.SetExternal(External{})
+
+	if callback != nil {
 		name := reflect.TypeOf(extractor).Name()
 		callback(event.OnExtractorFound{Name: name})
 	}
 
-	return extractor
+	return extractor, nil
 }
 
-func getMetadata(metadata model.Metadata, extractorType model.ExtractorType) map[string]interface{} {
-	data, exists := metadata[extractorType]
-	if !exists {
-		data = make(map[string]interface{})
-	}
+type External struct{}
 
-	return data
+func (External) ExpandMedia(media []model.Media, metadata *model.Metadata) []model.Media {
+	return funk.Map(media, func(m model.Media) model.Media {
+		if m.Type == model.Unknown {
+			uObj, err := New(m.Url, *metadata, nil)
+			if err != nil {
+				return m
+			}
+
+			resp, err := uObj.QueryMedia(1, make([]string, 0), false)
+			if err != nil {
+				return m
+			}
+
+			_, exists := (*metadata)[resp.Extractor]
+			if !exists {
+				(*metadata)[resp.Extractor] = make(map[string]interface{})
+				(*metadata)[resp.Extractor] = resp.Metadata[resp.Extractor]
+			}
+
+			if len(resp.Media) > 0 {
+				return resp.Media[0]
+			}
+		}
+
+		return m
+	}).([]model.Media)
 }
 
 // endregion

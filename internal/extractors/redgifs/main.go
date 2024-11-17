@@ -5,35 +5,40 @@ import (
 	"github.com/thoas/go-funk"
 	"github.com/vegidio/umd-lib/event"
 	"github.com/vegidio/umd-lib/fetch"
-	"github.com/vegidio/umd-lib/internal"
 	"github.com/vegidio/umd-lib/internal/model"
+	"github.com/vegidio/umd-lib/internal/utils"
 	"reflect"
 	"regexp"
 	"strings"
 )
 
 type Redgifs struct {
-	Metadata         map[string]interface{}
-	Callback         func(event event.Event)
-	responseMetadata map[string]interface{}
+	Metadata model.Metadata
+	Callback func(event event.Event)
+
+	responseMetadata model.Metadata
+	external         model.External
 }
 
 func IsMatch(url string) bool {
-	return internal.HasHost(url, "redgifs.com")
+	return utils.HasHost(url, "redgifs.com")
 }
 
-func (r *Redgifs) QueryMedia(url string, limit int, extensions []string) (*model.Response, error) {
+func (r *Redgifs) QueryMedia(url string, limit int, extensions []string, deep bool) (*model.Response, error) {
+	if r.responseMetadata == nil {
+		r.responseMetadata = make(model.Metadata)
+	}
+
 	source, err := r.getSourceType(url)
 	if err != nil {
 		return nil, err
 	}
 
-	videos, err := r.fetchVideos(source, limit, extensions)
+	media, err := r.fetchMedia(source, limit, extensions, deep)
 	if err != nil {
 		return nil, err
 	}
 
-	media := videosToMedia(videos)
 	if r.Callback != nil {
 		r.Callback(event.OnQueryCompleted{Total: len(media)})
 	}
@@ -50,6 +55,10 @@ func (r *Redgifs) GetFetch() fetch.Fetch {
 	return fetch.New(map[string]string{
 		"User-Agent": "UMD",
 	}, 0)
+}
+
+func (r *Redgifs) SetExternal(external model.External) {
+	r.external = external
 }
 
 // Compile-time assertion to ensure the extractor implements the Extractor interface
@@ -82,37 +91,39 @@ func (r *Redgifs) getSourceType(url string) (SourceType, error) {
 	return source, nil
 }
 
-func (r *Redgifs) fetchVideos(source SourceType, limit int, extensions []string) ([]Video, error) {
+func (r *Redgifs) fetchMedia(source SourceType, limit int, extensions []string, deep bool) ([]model.Media, error) {
+	media := make([]model.Media, 0)
 	videos := make([]Video, 0)
-	newVideos := make([]Video, 0)
+	amountQueried := 0
 	var err error
 
-	token, err := r.getToken(r.Metadata)
+	token, err := r.getToken()
 	if err != nil {
 		return nil, err
 	}
 
 	switch s := source.(type) {
 	case SourceVideo:
-		newVideos, err = r.fetchVideo(s, token)
+		videos, err = r.fetchVideo(s, token)
 	}
 
 	if err != nil {
-		return nil, err
+		return media, err
 	}
 
-	videos = append(videos, newVideos...)
+	newMedia := videosToMedia(videos)
+	media, amountQueried = utils.MergeMedia(media, newMedia)
 
 	if r.Callback != nil {
-		queried := len(newVideos)
-		r.Callback(event.OnMediaQueried{Amount: queried})
+		r.Callback(event.OnMediaQueried{Amount: amountQueried})
 	}
 
-	return videos, nil
+	media = append(media, newMedia...)
+	return media, nil
 }
 
-func (r *Redgifs) getToken(metadata map[string]interface{}) (string, error) {
-	token, exists := metadata["token"].(string)
+func (r *Redgifs) getToken() (string, error) {
+	token, exists := r.Metadata[model.RedGifs]["token"].(string)
 	if !exists {
 		auth, err := getToken()
 		if err != nil {
@@ -122,12 +133,14 @@ func (r *Redgifs) getToken(metadata map[string]interface{}) (string, error) {
 		token = auth.Token
 	}
 
-	if r.responseMetadata == nil {
-		r.responseMetadata = make(map[string]interface{})
-	}
+	if !exists {
+		if r.responseMetadata[model.RedGifs] == nil {
+			r.responseMetadata[model.RedGifs] = make(map[string]interface{})
+		}
 
-	// Save the token to be reused in the future
-	r.responseMetadata["token"] = token
+		// Save the token to be reused in the future
+		r.responseMetadata[model.RedGifs]["token"] = token
+	}
 
 	return token, nil
 }
@@ -152,7 +165,7 @@ func (r *Redgifs) fetchVideo(source SourceVideo, token string) ([]Video, error) 
 
 func videosToMedia(videos []Video) []model.Media {
 	return funk.Map(videos, func(video Video) model.Media {
-		return model.NewMedia(video.Gif.Url.Hd, map[string]interface{}{
+		return model.NewMedia(video.Gif.Url.Hd, model.RedGifs, map[string]interface{}{
 			"source":   "watch",
 			"name":     video.Gif.Username,
 			"created":  video.Gif.Created.Time,

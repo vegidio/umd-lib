@@ -1,6 +1,6 @@
 package redgifs
 
-import "github.com/vegidio/umd-lib/internal"
+import "github.com/vegidio/umd-lib/internal/utils"
 
 type Auth struct {
 	Token   string `json:"token"`
@@ -12,11 +12,11 @@ type Video struct {
 }
 
 type Gif struct {
-	Id       string             `json:"id"`
-	Username string             `json:"userName"`
-	Duration float64            `json:"duration"`
-	Url      Url                `json:"urls"`
-	Created  internal.EpochTime `json:"createDate"`
+	Id       string          `json:"id"`
+	Username string          `json:"userName"`
+	Duration float64         `json:"duration"`
+	Url      Url             `json:"urls"`
+	Created  utils.EpochTime `json:"createDate"`
 }
 
 type Url struct {

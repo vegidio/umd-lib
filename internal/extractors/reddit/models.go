@@ -1,6 +1,6 @@
 package reddit
 
-import "github.com/vegidio/umd-lib/internal"
+import "github.com/vegidio/umd-lib/internal/utils"
 
 type Submission struct {
 	Data SubmissionData `json:"data"`
@@ -18,7 +18,7 @@ type Child struct {
 type ChildData struct {
 	Author        string                 `json:"author"`
 	Url           string                 `json:"url"`
-	Created       internal.EpochTime     `json:"created"`
+	Created       utils.EpochTime        `json:"created"`
 	IsGallery     bool                   `json:"is_gallery"`
 	MediaMetadata map[string]interface{} `json:"media_metadata"`
 	SecureMedia   SecureMedia            `json:"secure_media"`
