@@ -99,7 +99,7 @@ func findExtractor(url string, metadata model.Metadata, callback func(event even
 type External struct{}
 
 func (External) ExpandMedia(media []model.Media, metadata *model.Metadata, parallel int) []model.Media {
-	result := make([]model.Media, len(media))
+	result := make([]model.Media, 0)
 
 	var mu sync.Mutex
 	var wg sync.WaitGroup
@@ -109,7 +109,11 @@ func (External) ExpandMedia(media []model.Media, metadata *model.Metadata, paral
 		wg.Add(1)
 
 		go func(current Media) {
-			defer wg.Done()
+			defer func() {
+				wg.Done()
+				<-sem
+			}()
+
 			sem <- struct{}{}
 
 			if current.Type == model.Unknown {
@@ -135,12 +139,10 @@ func (External) ExpandMedia(media []model.Media, metadata *model.Metadata, paral
 
 				if len(resp.Media) > 0 {
 					result = append(result, resp.Media[0])
-					return
 				}
+			} else {
+				result = append(result, current)
 			}
-
-			result = append(result, current)
-			<-sem
 		}(m)
 	}
 

@@ -11,7 +11,7 @@ func main() {
 		fmt.Println("Error:", err)
 	}
 
-	resp, err := umdObj.QueryMedia(99_999, make([]string, 0), true)
+	resp, err := umdObj.QueryMedia(5, make([]string, 0), true)
 	if err != nil {
 		fmt.Println("Error:", err)
 	}
