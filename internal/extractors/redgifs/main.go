@@ -115,8 +115,7 @@ func (r *Redgifs) fetchMedia(source SourceType, limit int, extensions []string, 
 	if r.Callback != nil {
 		r.Callback(event.OnMediaQueried{Amount: amountQueried})
 	}
-
-	media = append(media, newMedia...)
+	
 	return media, nil
 }
 
@@ -137,9 +136,9 @@ func (r *Redgifs) fetchVideo(source SourceVideo) ([]Video, error) {
 func videosToMedia(videos []Video, sourceName string, id string) []model.Media {
 	return funk.Map(videos, func(video Video) model.Media {
 		return model.NewMedia(video.Url, model.RedGifs, map[string]interface{}{
-			"author":  video.Author,
+			"name":    video.Author,
+			"source":  strings.ToLower(sourceName),
 			"created": video.Created,
-			"source":  sourceName,
 			"id":      id,
 		})
 	}).([]model.Media)
