@@ -132,12 +132,12 @@ func (External) ExpandMedia(media []model.Media, metadata *model.Metadata, paral
 				_, exists := (*metadata)[resp.Extractor]
 				if !exists {
 					mu.Lock()
-					(*metadata)[resp.Extractor] = make(map[string]interface{})
 					(*metadata)[resp.Extractor] = resp.Metadata[resp.Extractor]
 					mu.Unlock()
 				}
 
 				if len(resp.Media) > 0 {
+					resp.Media[0] = utils.MergeMetadata(m, resp.Media[0])
 					result = append(result, resp.Media[0])
 				}
 			} else {

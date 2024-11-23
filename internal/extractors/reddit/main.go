@@ -165,7 +165,7 @@ func submissionsToMedia(submissions []Child, sourceName string, name string) []m
 		}
 
 		return model.NewMedia(url, model.Reddit, map[string]interface{}{
-			"source":  sourceName,
+			"source":  strings.ToLower(sourceName),
 			"name":    name,
 			"created": submission.Data.Created.Time,
 		})
