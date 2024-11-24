@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/vegidio/umd-lib/event"
 	"github.com/vegidio/umd-lib/fetch"
+	"github.com/vegidio/umd-lib/internal/extractors/coomer"
 	"github.com/vegidio/umd-lib/internal/extractors/reddit"
 	"github.com/vegidio/umd-lib/internal/extractors/redgifs"
 	"github.com/vegidio/umd-lib/internal/model"
@@ -76,6 +77,8 @@ func findExtractor(url string, metadata model.Metadata, callback func(event even
 	var extractor model.Extractor
 
 	switch {
+	case coomer.IsMatch(url):
+		extractor = &coomer.Coomer{Metadata: metadata, Callback: callback}
 	case reddit.IsMatch(url):
 		extractor = &reddit.Reddit{Metadata: metadata, Callback: callback}
 	case redgifs.IsMatch(url):
@@ -110,8 +113,8 @@ func (External) ExpandMedia(media []model.Media, metadata *model.Metadata, paral
 
 		go func(current Media) {
 			defer func() {
-				wg.Done()
 				<-sem
+				wg.Done()
 			}()
 
 			sem <- struct{}{}

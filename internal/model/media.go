@@ -29,13 +29,27 @@ func (m Media) String() string {
 		m.Url, m.Extension, m.Type, m.Extractor, m.Metadata)
 }
 
-func NewMedia(url string, extractor ExtractorType, metadata map[string]interface{}) Media {
+func NewMedia(urlStr string, extractor ExtractorType, metadata map[string]interface{}) Media {
+	parsedURL, err := url.Parse(urlStr)
+	if err != nil {
+		panic("Error parsing URL: " + err.Error())
+	}
+
+	parsedURL.RawQuery = ""
+	cleanUrl := parsedURL.String()
+	extension := getExtension(cleanUrl)
+
 	if metadata == nil {
 		metadata = make(map[string]interface{})
 	}
 
-	extension := getExtension(url)
-	return Media{Url: url, Extension: extension, Type: getType(extension), Extractor: extractor, Metadata: metadata}
+	return Media{
+		Url:       cleanUrl,
+		Extension: extension,
+		Type:      getType(extension),
+		Extractor: extractor,
+		Metadata:  metadata,
+	}
 }
 
 // region - Private functions

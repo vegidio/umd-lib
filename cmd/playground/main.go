@@ -7,7 +7,7 @@ import (
 )
 
 func main() {
-	umdObj, err := umd.New("https://www.reddit.com/user/atomicbrunette18/", nil, nil)
+	umdObj, err := umd.New("https://coomer.su/onlyfans/user/belledelphine/post/1101526004", nil, nil)
 	if err != nil {
 		fmt.Println("Error:", err)
 	}
@@ -17,6 +17,7 @@ func main() {
 		fmt.Println("Error:", err)
 	}
 
-	j, _ := json.MarshalIndent(resp.Media, "", "  ")
+	j, _ := json.MarshalIndent(resp, "", "  ")
 	fmt.Println("Response:", string(j))
+	fmt.Println("Number of files:", len(resp.Media))
 }

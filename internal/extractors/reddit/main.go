@@ -2,7 +2,7 @@ package reddit
 
 import (
 	"fmt"
-	"github.com/thoas/go-funk"
+	"github.com/samber/lo"
 	"github.com/vegidio/umd-lib/event"
 	"github.com/vegidio/umd-lib/fetch"
 	"github.com/vegidio/umd-lib/internal/model"
@@ -158,7 +158,7 @@ func (r *Reddit) fetchMedia(source SourceType, limit int, extensions []string, d
 // region - Private functions
 
 func submissionsToMedia(submissions []Child, sourceName string, name string) []model.Media {
-	return funk.Map(submissions, func(submission Child) model.Media {
+	return lo.Map(submissions, func(submission Child, _ int) model.Media {
 		url := submission.Data.SecureMedia.RedditVideo.FallbackUrl
 		if url == "" {
 			url = submission.Data.Url
@@ -169,7 +169,7 @@ func submissionsToMedia(submissions []Child, sourceName string, name string) []m
 			"name":    name,
 			"created": submission.Data.Created.Time,
 		})
-	}).([]model.Media)
+	})
 }
 
 // endregion

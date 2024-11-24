@@ -2,7 +2,7 @@ package redgifs
 
 import (
 	"fmt"
-	"github.com/thoas/go-funk"
+	"github.com/samber/lo"
 	"github.com/vegidio/umd-lib/event"
 	"github.com/vegidio/umd-lib/fetch"
 	"github.com/vegidio/umd-lib/internal/model"
@@ -115,7 +115,7 @@ func (r *Redgifs) fetchMedia(source SourceType, limit int, extensions []string, 
 	if r.Callback != nil {
 		r.Callback(event.OnMediaQueried{Amount: amountQueried})
 	}
-	
+
 	return media, nil
 }
 
@@ -134,14 +134,14 @@ func (r *Redgifs) fetchVideo(source SourceVideo) ([]Video, error) {
 // region - Private functions
 
 func videosToMedia(videos []Video, sourceName string, id string) []model.Media {
-	return funk.Map(videos, func(video Video) model.Media {
+	return lo.Map(videos, func(video Video, _ int) model.Media {
 		return model.NewMedia(video.Url, model.RedGifs, map[string]interface{}{
 			"name":    video.Author,
 			"source":  strings.ToLower(sourceName),
 			"created": video.Created,
 			"id":      id,
 		})
-	}).([]model.Media)
+	})
 }
 
 // endregion
