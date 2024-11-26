@@ -1,9 +1,8 @@
 package main
 
 import (
-	"fmt"
 	log "github.com/sirupsen/logrus"
-	"github.com/vegidio/umd-lib/fetch"
+	"github.com/vegidio/umd-lib"
 )
 
 func main() {
@@ -13,7 +12,8 @@ func main() {
 		TimestampFormat: "2006-01-02 15:04:05.000",
 	})
 
-	f := fetch.New(nil, 10)
-	html, _ := f.GetText("https://httpbin.org/status/429")
-	fmt.Println(html)
+	u, _ := umd.New("https://coomer.su/onlyfans/user/missbella", nil, nil)
+	resp, _ := u.QueryMedia(99999, nil, false)
+
+	log.Info("Found ", len(resp.Media), " media")
 }

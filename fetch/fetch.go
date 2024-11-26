@@ -3,13 +3,16 @@ package fetch
 import (
 	"fmt"
 	"github.com/go-resty/resty/v2"
+	"github.com/go-rod/rod"
+	"github.com/go-rod/rod/lib/proto"
 	log "github.com/sirupsen/logrus"
 	"net/http"
 	"time"
 )
 
 type Fetch struct {
-	client *resty.Client
+	client  *resty.Client
+	retries int
 }
 
 // New creates a new Fetch instance with specified headers and retry settings.
@@ -40,6 +43,7 @@ func New(headers map[string]string, retries int) Fetch {
 					return false
 				},
 			),
+		retries: retries,
 	}
 }
 
@@ -87,9 +91,49 @@ func (f Fetch) DownloadFile(url string, filePath string) (int64, error) {
 	return resp.Size(), nil
 }
 
+func (f Fetch) GetHtml(url string) (string, error) {
+	// Launch a new browser instance
+	browser := rod.New().MustConnect()
+	defer browser.MustClose()
+
+	var page *rod.Page
+	var e proto.NetworkResponseReceived
+
+	for attempt := 1; attempt <= f.retries; attempt++ {
+		page, _ = browser.Page(proto.TargetCreateTarget{})
+		wait := page.Context(browser.GetContext()).WaitEvent(&e)
+		page.Navigate(url)
+		wait()
+
+		if e.Response.Status == http.StatusTooManyRequests {
+			sleep := time.Duration(fibonacci(attempt+1)) * time.Second
+
+			log.WithFields(log.Fields{
+				"attempt": attempt,
+				"url":     url,
+			}).Debug("Too many requests - Retrying in ", sleep)
+
+			time.Sleep(sleep)
+		} else {
+			break
+		}
+	}
+
+	html, err := page.HTML()
+	if err != nil {
+		return "", fmt.Errorf("failed to get HTML content: %w", err)
+	}
+
+	return html, nil
+}
+
+// region - Private functions
+
 func fibonacci(n int) int {
 	if n <= 1 {
 		return n
 	}
 	return fibonacci(n-1) + fibonacci(n-2)
 }
+
+// endregion
