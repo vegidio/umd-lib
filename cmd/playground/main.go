@@ -1,23 +1,19 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
-	"github.com/vegidio/umd-lib"
+	log "github.com/sirupsen/logrus"
+	"github.com/vegidio/umd-lib/fetch"
 )
 
 func main() {
-	umdObj, err := umd.New("https://coomer.su/onlyfans/user/belledelphine/post/1101526004", nil, nil)
-	if err != nil {
-		fmt.Println("Error:", err)
-	}
+	log.SetLevel(log.DebugLevel)
+	log.SetFormatter(&log.TextFormatter{
+		FullTimestamp:   true,
+		TimestampFormat: "2006-01-02 15:04:05.000",
+	})
 
-	resp, err := umdObj.QueryMedia(99999, make([]string, 0), true)
-	if err != nil {
-		fmt.Println("Error:", err)
-	}
-
-	j, _ := json.MarshalIndent(resp, "", "  ")
-	fmt.Println("Response:", string(j))
-	fmt.Println("Number of files:", len(resp.Media))
+	f := fetch.New(nil, 10)
+	html, _ := f.GetText("https://httpbin.org/status/429")
+	fmt.Println(html)
 }

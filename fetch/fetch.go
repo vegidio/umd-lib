@@ -3,6 +3,7 @@ package fetch
 import (
 	"fmt"
 	"github.com/go-resty/resty/v2"
+	log "github.com/sirupsen/logrus"
 	"net/http"
 	"time"
 )
@@ -10,8 +11,6 @@ import (
 type Fetch struct {
 	client *resty.Client
 }
-
-// region
 
 // New creates a new Fetch instance with specified headers and retry settings.
 //
@@ -23,11 +22,22 @@ func New(headers map[string]string, retries int) Fetch {
 		client: resty.New().
 			SetHeaders(headers).
 			SetRetryCount(retries).
-			SetRetryWaitTime(1 * time.Second).
-			SetRetryMaxWaitTime(60 * time.Second).
+			SetRetryWaitTime(0).
 			AddRetryCondition(
 				func(r *resty.Response, err error) bool {
-					return err != nil || r.StatusCode() == http.StatusTooManyRequests
+					if r.StatusCode() == http.StatusTooManyRequests {
+						sleep := time.Duration(fibonacci(r.Request.Attempt+1)) * time.Second
+
+						log.WithFields(log.Fields{
+							"attempt": r.Request.Attempt,
+							"url":     r.Request.URL,
+						}).Debug("Too many requests - Retrying in ", sleep)
+
+						time.Sleep(sleep)
+						return true
+					}
+
+					return false
 				},
 			),
 	}
@@ -77,4 +87,9 @@ func (f Fetch) DownloadFile(url string, filePath string) (int64, error) {
 	return resp.Size(), nil
 }
 
-// endregion
+func fibonacci(n int) int {
+	if n <= 1 {
+		return n
+	}
+	return fibonacci(n-1) + fibonacci(n-2)
+}
