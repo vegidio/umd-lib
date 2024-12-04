@@ -58,14 +58,86 @@ func (f Fetch) GetText(url string) (string, error) {
 		Get(url)
 
 	if err != nil {
-		return "", fmt.Errorf("fetch error - GetString - %v", err)
+		log.Error(err)
+		return "", fmt.Errorf("fetch error - GetText - %v", err)
 	}
 
 	if resp.IsError() {
-		return "", fmt.Errorf("fetch error - GetString - %d", resp.StatusCode())
+		log.Error(err)
+		return "", fmt.Errorf("fetch error - GetText - %d", resp.StatusCode())
 	}
 
 	return resp.String(), nil
+}
+
+// GetHtml uses the browser to perform a GET request to the specified URL and returns the response body as a string.
+//
+// Parameters:
+//   - browser: the browser instance to use for the request.
+//   - url: the URL to send the GET request to.
+//   - element: the selector for the element to wait for before returning the response body.
+//
+// Returns the response body as a string and an error if the request fails.
+func (f Fetch) GetHtml(browser *rod.Browser, url string, element string) (string, error) {
+	var e proto.NetworkResponseReceived
+
+	page, err := browser.Page(proto.TargetCreateTarget{})
+	if err != nil {
+		log.Error(err)
+		return "", err
+	}
+
+	defer page.Close()
+	context := browser.GetContext()
+
+	for attempt := 1; attempt <= f.retries; attempt++ {
+		wait := page.Context(context).WaitEvent(&e)
+		err = page.Timeout(10 * time.Second).Navigate(url)
+		if err != nil {
+			log.Error(err)
+			return "", err
+		}
+
+		wait()
+
+		if e.Response.Status == http.StatusTooManyRequests {
+			sleep := time.Duration(fibonacci(attempt+1)) * time.Second
+
+			log.WithFields(log.Fields{
+				"attempt": attempt,
+				"url":     url,
+			}).Debug("Too many requests - Retrying in ", sleep)
+
+			time.Sleep(sleep)
+		} else {
+			log.WithFields(log.Fields{
+				"status": e.Response.Status,
+				"url":    url,
+			}).Debug("Successful response")
+
+			break
+		}
+	}
+
+	el, err := page.Element(element)
+	if err != nil {
+		log.Error(err)
+		return "", err
+	}
+
+	err = el.Timeout(10 * time.Second).WaitVisible()
+	if err != nil {
+		log.Error(err)
+		return "", err
+	}
+
+	html, err := page.HTML()
+	if err != nil {
+		log.Error(err)
+		return "", err
+	}
+
+	return html, nil
 }
 
 // DownloadFile performs a GET request to the specified URL and saves the response body to the specified file path.
@@ -81,50 +153,17 @@ func (f Fetch) DownloadFile(url string, filePath string) (int64, error) {
 		Get(url)
 
 	if err != nil {
+		log.Error(err)
 		return 0, fmt.Errorf("fetch error - DownloadFile - %v", err)
 	}
 
 	if resp.IsError() {
-		return 0, fmt.Errorf("fetch error - DownloadFile - %d", resp.StatusCode())
+		err = fmt.Errorf("fetch error - DownloadFile - %d", resp.StatusCode())
+		log.Error(err)
+		return 0, err
 	}
 
 	return resp.Size(), nil
-}
-
-func (f Fetch) GetHtml(url string) (string, error) {
-	// Launch a new browser instance
-	browser := rod.New().MustConnect()
-	defer browser.MustClose()
-
-	var page *rod.Page
-	var e proto.NetworkResponseReceived
-
-	for attempt := 1; attempt <= f.retries; attempt++ {
-		page, _ = browser.Page(proto.TargetCreateTarget{})
-		wait := page.Context(browser.GetContext()).WaitEvent(&e)
-		page.Navigate(url)
-		wait()
-
-		if e.Response.Status == http.StatusTooManyRequests {
-			sleep := time.Duration(fibonacci(attempt+1)) * time.Second
-
-			log.WithFields(log.Fields{
-				"attempt": attempt,
-				"url":     url,
-			}).Debug("Too many requests - Retrying in ", sleep)
-
-			time.Sleep(sleep)
-		} else {
-			break
-		}
-	}
-
-	html, err := page.HTML()
-	if err != nil {
-		return "", fmt.Errorf("failed to get HTML content: %w", err)
-	}
-
-	return html, nil
 }
 
 // region - Private functions

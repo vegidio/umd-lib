@@ -3,7 +3,9 @@ package coomer
 import (
 	"fmt"
 	"github.com/PuerkitoBio/goquery"
+	"github.com/go-rod/rod"
 	"github.com/samber/lo"
+	log "github.com/sirupsen/logrus"
 	"github.com/vegidio/umd-lib/fetch"
 	"github.com/vegidio/umd-lib/internal/model"
 	"math"
@@ -13,16 +15,19 @@ import (
 	"time"
 )
 
-var f = fetch.New(nil, 6)
+var f = fetch.New(nil, 10)
 
-func countPages(url string) (int, error) {
-	html, err := f.GetText(url)
+func countPages(browser *rod.Browser, url string) (int, error) {
+	element := "div#paginator-top small"
+	html, err := f.GetHtml(browser, url, element)
 	if err != nil {
+		log.Error(err)
 		return 0, err
 	}
 
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(html))
 	if err != nil {
+		log.Error(err)
 		return 0, err
 	}
 
@@ -31,6 +36,7 @@ func countPages(url string) (int, error) {
 
 	num, err := strconv.ParseFloat(matches[1], 64)
 	if err != nil {
+		log.Error(err)
 		return 0, err
 	}
 
@@ -38,20 +44,23 @@ func countPages(url string) (int, error) {
 	return pages, nil
 }
 
-func getPostUrls(url string) ([]string, error) {
+func getPostUrls(browser *rod.Browser, url string) ([]string, error) {
 	urls := make([]string, 0)
 
-	html, err := f.GetText(url)
+	element := "article"
+	html, err := f.GetHtml(browser, url, element)
 	if err != nil {
+		log.Error(err)
 		return urls, err
 	}
 
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(html))
 	if err != nil {
+		log.Error(err)
 		return urls, err
 	}
 
-	return doc.Find("article").
+	return doc.Find(element).
 		Map(func(i int, s *goquery.Selection) string {
 			service, _ := s.Attr("data-service")
 			user, _ := s.Attr("data-user")
@@ -61,30 +70,33 @@ func getPostUrls(url string) ([]string, error) {
 		}), nil
 }
 
-func getPostMedia(url string, service string, user string) ([]model.Media, error) {
+func getPostMedia(browser *rod.Browser, url string, service string, user string) ([]model.Media, error) {
 	media := make([]model.Media, 0)
 
-	html, err := f.GetText(url)
+	// Get the post ID
+	index := strings.LastIndex(url, "/")
+	postId := url[index+1:]
+
+	element := "div.post__published"
+	html, err := f.GetHtml(browser, url, element)
 	if err != nil {
+		log.Error(err)
 		return media, err
 	}
 
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(html))
 	if err != nil {
+		log.Error(err)
 		return media, err
 	}
 
-	postId, exists := doc.Find("meta[name='id']").Attr("content")
-	if !exists {
-		return media, err
-	}
-
-	result := doc.Find("div.post__published").Text()
+	result := doc.Find(element).Text()
 	matches := regexp.MustCompile(`Published: (.+)`).FindStringSubmatch(result)
 	dateTime := matches[1]
 
-	parsedTime, err := time.Parse("2006-01-02 15:04:05", dateTime)
+	parsedTime, err := time.Parse("2006-01-02T15:04:05", dateTime)
 	if err != nil {
+		log.Error(err)
 		parsedTime = time.Now()
 	}
 

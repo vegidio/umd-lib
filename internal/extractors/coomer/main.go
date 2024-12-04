@@ -2,6 +2,7 @@ package coomer
 
 import (
 	"fmt"
+	"github.com/go-rod/rod"
 	"github.com/vegidio/umd-lib/event"
 	"github.com/vegidio/umd-lib/fetch"
 	"github.com/vegidio/umd-lib/internal/model"
@@ -17,6 +18,7 @@ type Coomer struct {
 
 	responseMetadata model.Metadata
 	external         model.External
+	browser          *rod.Browser
 }
 
 func IsMatch(url string) bool {
@@ -24,6 +26,9 @@ func IsMatch(url string) bool {
 }
 
 func (c *Coomer) QueryMedia(url string, limit int, extensions []string, deep bool) (*model.Response, error) {
+	c.browser = rod.New().MustConnect()
+	defer c.browser.MustClose()
+
 	if c.responseMetadata == nil {
 		c.responseMetadata = make(model.Metadata)
 	}
@@ -106,7 +111,7 @@ func (c *Coomer) fetchMedia(source SourceType, limit int, extensions []string, d
 		media, err = c.fetchUserMedia(s, limit, extensions)
 	case SourcePost:
 		url := fmt.Sprintf("https://coomer.su/%s/user/%s/post/%s", s.Service, s.User, s.Id)
-		media, err = getPostMedia(url, s.Service, s.User)
+		media, err = getPostMedia(c.browser, url, s.Service, s.User)
 	}
 
 	if err != nil {
@@ -126,28 +131,28 @@ func (c *Coomer) fetchUserMedia(source SourceUser, limit int, extensions []strin
 	amountQueried := 0
 
 	url := fmt.Sprintf("https://coomer.su/%s/user/%s", source.Service, source.User)
-	numPages, err := countPages(url)
+	numPages, err := countPages(c.browser, url)
 	if err != nil {
 		return media, err
 	}
 
 outerLoop:
-	for i := 0; i <= numPages; i++ {
+	for i := 0; i < numPages; i++ {
 		url = fmt.Sprintf("https://coomer.su/%s/user/%s?o=%d", source.Service, source.User, i*50)
-		postUrls, err1 := getPostUrls(url)
+		postUrls, err1 := getPostUrls(c.browser, url)
 		if err1 != nil {
-			return media, err
+			return media, err1
 		}
 
 		for _, postUrl := range postUrls {
-			postMedia, err2 := getPostMedia(postUrl, source.Service, source.User)
+			postMedia, err2 := getPostMedia(c.browser, postUrl, source.Service, source.User)
 			if err2 != nil {
-				return media, err
+				return media, err2
 			}
 
 			media, amountQueried = utils.MergeMedia(media, postMedia)
 
-			if c.Callback != nil {
+			if c.Callback != nil && amountQueried > 0 {
 				c.Callback(event.OnMediaQueried{Amount: amountQueried})
 			}
 
