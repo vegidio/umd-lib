@@ -47,7 +47,7 @@ func countPages(browser *rod.Browser, url string) (int, error) {
 func getPostUrls(browser *rod.Browser, url string) ([]string, error) {
 	urls := make([]string, 0)
 
-	element := "article"
+	element := "article.post-card"
 	html, err := f.GetHtml(browser, url, element)
 	if err != nil {
 		log.Error(err)

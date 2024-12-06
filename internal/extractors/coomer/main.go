@@ -102,7 +102,7 @@ func (c *Coomer) getSourceType(url string) (SourceType, error) {
 	return source, nil
 }
 
-func (c *Coomer) fetchMedia(source SourceType, limit int, extensions []string, deep bool) ([]model.Media, error) {
+func (c *Coomer) fetchMedia(source SourceType, limit int, extensions []string, _ bool) ([]model.Media, error) {
 	media := make([]model.Media, 0)
 	var err error
 

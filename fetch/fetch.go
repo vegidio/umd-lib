@@ -34,7 +34,7 @@ func New(headers map[string]string, retries int) Fetch {
 						log.WithFields(log.Fields{
 							"attempt": r.Request.Attempt,
 							"url":     r.Request.URL,
-						}).Debug("Too many requests - Retrying in ", sleep)
+						}).Debug("Too many requests; retrying in ", sleep)
 
 						time.Sleep(sleep)
 						return true
@@ -58,13 +58,19 @@ func (f Fetch) GetText(url string) (string, error) {
 		Get(url)
 
 	if err != nil {
-		log.Error(err)
-		return "", fmt.Errorf("fetch error - GetText - %v", err)
+		log.WithFields(log.Fields{
+			"url": url,
+		}).Error("Error getting text: ", err)
+
+		return "", err
 	}
 
 	if resp.IsError() {
-		log.Error(err)
-		return "", fmt.Errorf("fetch error - GetText - %d", resp.StatusCode())
+		log.WithFields(log.Fields{
+			"status": resp.StatusCode(),
+		}).Error("Error getting text: ", resp.Status())
+
+		return "", fmt.Errorf(resp.Status())
 	}
 
 	return resp.String(), nil
@@ -80,64 +86,72 @@ func (f Fetch) GetText(url string) (string, error) {
 // Returns the response body as a string and an error if the request fails.
 func (f Fetch) GetHtml(browser *rod.Browser, url string, element string) (string, error) {
 	var e proto.NetworkResponseReceived
+	var err error
+	var html string
 
 	page, err := browser.Page(proto.TargetCreateTarget{})
 	if err != nil {
-		log.Error(err)
+		log.WithFields(log.Fields{
+			"element": element,
+			"url":     url,
+		}).Error("Error creating browser page: ", err)
+
 		return "", err
 	}
 
-	defer page.Close()
+	defer page.MustClose()
 	context := browser.GetContext()
 
 	for attempt := 1; attempt <= f.retries; attempt++ {
 		wait := page.Context(context).WaitEvent(&e)
 		err = page.Timeout(10 * time.Second).Navigate(url)
 		if err != nil {
-			log.Error(err)
+			log.WithFields(log.Fields{
+				"element": element,
+				"url":     url,
+			}).Error("Error navigating to page: ", err)
+
 			return "", err
 		}
 
 		wait()
 
-		if e.Response.Status == http.StatusTooManyRequests {
+		var el *rod.Element
+
+		// If the HTTP code for too many request
+		success := e.Response.Status != http.StatusTooManyRequests
+
+		if success {
+			el, err = page.Timeout(5 * time.Second).Element(element)
+			success = err == nil
+		}
+
+		if success {
+			err = el.Timeout(5 * time.Second).WaitVisible()
+			success = err == nil
+		}
+
+		if success {
+			html, err = page.HTML()
+			success = err == nil
+		}
+
+		if success {
+			break
+		} else {
 			sleep := time.Duration(fibonacci(attempt+1)) * time.Second
 
 			log.WithFields(log.Fields{
 				"attempt": attempt,
+				"element": element,
 				"url":     url,
-			}).Debug("Too many requests - Retrying in ", sleep)
+			}).Debug("Error getting HTML; retrying in ", sleep)
 
 			time.Sleep(sleep)
-		} else {
-			log.WithFields(log.Fields{
-				"status": e.Response.Status,
-				"url":    url,
-			}).Debug("Successful response")
-
-			break
 		}
 	}
 
-	el, err := page.Element(element)
-	if err != nil {
-		log.Error(err)
-		return "", err
-	}
-
-	err = el.Timeout(10 * time.Second).WaitVisible()
-	if err != nil {
-		log.Error(err)
-		return "", err
-	}
-
-	html, err := page.HTML()
-	if err != nil {
-		log.Error(err)
-		return "", err
-	}
-
-	return html, nil
+	return html, err
 }
 
 // DownloadFile performs a GET request to the specified URL and saves the response body to the specified file path.
@@ -153,14 +167,21 @@ func (f Fetch) DownloadFile(url string, filePath string) (int64, error) {
 		Get(url)
 
 	if err != nil {
-		log.Error(err)
+		log.WithFields(log.Fields{
+			"filePath": filePath,
+			"url":      url,
+		}).Debug("Error downloading file: ", err)
+
 		return 0, fmt.Errorf("fetch error - DownloadFile - %v", err)
 	}
 
 	if resp.IsError() {
-		err = fmt.Errorf("fetch error - DownloadFile - %d", resp.StatusCode())
-		log.Error(err)
-		return 0, err
+		log.WithFields(log.Fields{
+			"status": resp.StatusCode(),
+			"url":    url,
+		}).Debug("Error downloading file: ", resp.Status())
+
+		return 0, fmt.Errorf(resp.Status())
 	}
 
 	return resp.Size(), nil
