@@ -17,9 +17,9 @@ import (
 
 var f = fetch.New(nil, 10)
 
-func countPages(browser *rod.Browser, url string) (int, error) {
+func countPages(page *rod.Page, url string) (int, error) {
 	element := "div#paginator-top small"
-	html, err := f.GetHtml(browser, url, element)
+	html, err := f.GetHtml(page, url, element)
 	if err != nil {
 		log.Error(err)
 		return 0, err
@@ -44,11 +44,11 @@ func countPages(browser *rod.Browser, url string) (int, error) {
 	return pages, nil
 }
 
-func getPostUrls(browser *rod.Browser, url string) ([]string, error) {
+func getPostUrls(page *rod.Page, url string) ([]string, error) {
 	urls := make([]string, 0)
 
 	element := "article.post-card"
-	html, err := f.GetHtml(browser, url, element)
+	html, err := f.GetHtml(page, url, element)
 	if err != nil {
 		log.Error(err)
 		return urls, err
@@ -70,7 +70,7 @@ func getPostUrls(browser *rod.Browser, url string) ([]string, error) {
 		}), nil
 }
 
-func getPostMedia(browser *rod.Browser, url string, service string, user string) ([]model.Media, error) {
+func getPostMedia(page *rod.Page, url string, service string, user string) ([]model.Media, error) {
 	media := make([]model.Media, 0)
 
 	// Get the post ID
@@ -78,7 +78,7 @@ func getPostMedia(browser *rod.Browser, url string, service string, user string)
 	postId := url[index+1:]
 
 	element := "div.post__published"
-	html, err := f.GetHtml(browser, url, element)
+	html, err := f.GetHtml(page, url, element)
 	if err != nil {
 		log.Error(err)
 		return media, err

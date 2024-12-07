@@ -3,6 +3,7 @@ package coomer
 import (
 	"fmt"
 	"github.com/go-rod/rod"
+	"github.com/go-rod/rod/lib/proto"
 	"github.com/vegidio/umd-lib/event"
 	"github.com/vegidio/umd-lib/fetch"
 	"github.com/vegidio/umd-lib/internal/model"
@@ -18,7 +19,7 @@ type Coomer struct {
 
 	responseMetadata model.Metadata
 	external         model.External
-	browser          *rod.Browser
+	page             *rod.Page
 }
 
 func IsMatch(url string) bool {
@@ -26,8 +27,16 @@ func IsMatch(url string) bool {
 }
 
 func (c *Coomer) QueryMedia(url string, limit int, extensions []string, deep bool) (*model.Response, error) {
-	c.browser = rod.New().MustConnect()
-	defer c.browser.MustClose()
+	var err error
+	browser := rod.New().MustConnect()
+	defer browser.MustClose()
+
+	c.page, err = browser.Page(proto.TargetCreateTarget{})
+	if err != nil {
+		return nil, err
+	}
+
+	defer c.page.MustClose()
 
 	if c.responseMetadata == nil {
 		c.responseMetadata = make(model.Metadata)
@@ -111,7 +120,7 @@ func (c *Coomer) fetchMedia(source SourceType, limit int, extensions []string, _
 		media, err = c.fetchUserMedia(s, limit, extensions)
 	case SourcePost:
 		url := fmt.Sprintf("https://coomer.su/%s/user/%s/post/%s", s.Service, s.User, s.Id)
-		media, err = getPostMedia(c.browser, url, s.Service, s.User)
+		media, err = getPostMedia(c.page, url, s.Service, s.User)
 	}
 
 	if err != nil {
@@ -131,7 +140,7 @@ func (c *Coomer) fetchUserMedia(source SourceUser, limit int, extensions []strin
 	amountQueried := 0
 
 	url := fmt.Sprintf("https://coomer.su/%s/user/%s", source.Service, source.User)
-	numPages, err := countPages(c.browser, url)
+	numPages, err := countPages(c.page, url)
 	if err != nil {
 		return media, err
 	}
@@ -139,13 +148,13 @@ func (c *Coomer) fetchUserMedia(source SourceUser, limit int, extensions []strin
 outerLoop:
 	for i := 0; i < numPages; i++ {
 		url = fmt.Sprintf("https://coomer.su/%s/user/%s?o=%d", source.Service, source.User, i*50)
-		postUrls, err1 := getPostUrls(c.browser, url)
+		postUrls, err1 := getPostUrls(c.page, url)
 		if err1 != nil {
 			return media, err1
 		}
 
 		for _, postUrl := range postUrls {
-			postMedia, err2 := getPostMedia(c.browser, postUrl, source.Service, source.User)
+			postMedia, err2 := getPostMedia(c.page, postUrl, source.Service, source.User)
 			if err2 != nil {
 				return media, err2
 			}

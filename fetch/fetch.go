@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"github.com/go-resty/resty/v2"
 	"github.com/go-rod/rod"
-	"github.com/go-rod/rod/lib/proto"
 	log "github.com/sirupsen/logrus"
 	"net/http"
 	"time"
@@ -84,59 +83,33 @@ func (f Fetch) GetText(url string) (string, error) {
 //   - element: the selector for the element to wait for before returning the response body.
 //
 // Returns the response body as a string and an error if the request fails.
-func (f Fetch) GetHtml(browser *rod.Browser, url string, element string) (string, error) {
-	var e proto.NetworkResponseReceived
-	var err error
+func (f Fetch) GetHtml(page *rod.Page, url string, element string) (string, error) {
 	var html string
-
-	page, err := browser.Page(proto.TargetCreateTarget{})
-	if err != nil {
-		log.WithFields(log.Fields{
-			"element": element,
-			"url":     url,
-		}).Error("Error creating browser page: ", err)
-
-		return "", err
-	}
-
-	defer page.MustClose()
-	context := browser.GetContext()
+	var err error
 
 	for attempt := 1; attempt <= f.retries; attempt++ {
-		wait := page.Context(context).WaitEvent(&e)
-		err = page.Timeout(10 * time.Second).Navigate(url)
-		if err != nil {
-			log.WithFields(log.Fields{
-				"element": element,
-				"url":     url,
-			}).Error("Error navigating to page: ", err)
-
-			return "", err
-		}
-
-		wait()
-
 		var el *rod.Element
 
-		// If the HTTP code for too many request
-		success := e.Response.Status != http.StatusTooManyRequests
+		// Navigate to the URL
+		err = page.Timeout(5 * time.Second).Navigate(url)
+		err = replaceError(err, fmt.Errorf("failed to navigate to URL"))
 
-		if success {
+		if err == nil {
 			el, err = page.Timeout(5 * time.Second).Element(element)
-			success = err == nil
+			err = replaceError(err, fmt.Errorf("failed to get element"))
 		}
 
-		if success {
+		if err == nil {
 			err = el.Timeout(5 * time.Second).WaitVisible()
-			success = err == nil
+			err = replaceError(err, fmt.Errorf("failed waiting for element to be visible"))
 		}
 
-		if success {
-			html, err = page.HTML()
-			success = err == nil
+		if err == nil {
+			html, err = page.Timeout(5 * time.Second).HTML()
+			err = replaceError(err, fmt.Errorf("failed to get page HTML"))
 		}
 
-		if success {
+		if err == nil {
 			break
 		} else {
 			sleep := time.Duration(fibonacci(attempt+1)) * time.Second
@@ -144,8 +117,9 @@ func (f Fetch) GetHtml(browser *rod.Browser, url string, element string) (string
 			log.WithFields(log.Fields{
 				"attempt": attempt,
 				"element": element,
+				"error":   err,
 				"url":     url,
-			}).Debug("Error getting HTML; retrying in ", sleep)
+			}).Warn("Error getting HTML; retrying in ", sleep)
 
 			time.Sleep(sleep)
 		}
@@ -172,7 +146,7 @@ func (f Fetch) DownloadFile(url string, filePath string) (int64, error) {
 			"url":      url,
 		}).Debug("Error downloading file: ", err)
 
-		return 0, fmt.Errorf("fetch error - DownloadFile - %v", err)
+		return 0, err
 	}
 
 	if resp.IsError() {
@@ -194,6 +168,13 @@ func fibonacci(n int) int {
 		return n
 	}
 	return fibonacci(n-1) + fibonacci(n-2)
+}
+
+func replaceError(err error, fallback error) error {
+	if err != nil {
+		return fallback
+	}
+	return err
 }
 
 // endregion
