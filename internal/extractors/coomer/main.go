@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/proto"
+	log "github.com/sirupsen/logrus"
 	"github.com/vegidio/umd-lib/event"
 	"github.com/vegidio/umd-lib/fetch"
 	"github.com/vegidio/umd-lib/internal/model"
@@ -19,6 +20,7 @@ type Coomer struct {
 
 	responseMetadata model.Metadata
 	external         model.External
+	browser          *rod.Browser
 	page             *rod.Page
 }
 
@@ -28,15 +30,15 @@ func IsMatch(url string) bool {
 
 func (c *Coomer) QueryMedia(url string, limit int, extensions []string, deep bool) (*model.Response, error) {
 	var err error
-	browser := rod.New().MustConnect()
-	defer browser.MustClose()
+	c.browser = rod.New().MustConnect()
+	defer c.browser.Close()
 
-	c.page, err = browser.Page(proto.TargetCreateTarget{})
+	c.page, err = c.browser.Page(proto.TargetCreateTarget{})
 	if err != nil {
 		return nil, err
 	}
 
-	defer c.page.MustClose()
+	defer c.page.Close()
 
 	if c.responseMetadata == nil {
 		c.responseMetadata = make(model.Metadata)
@@ -147,6 +149,18 @@ func (c *Coomer) fetchUserMedia(source SourceUser, limit int, extensions []strin
 
 outerLoop:
 	for i := 0; i < numPages; i++ {
+		// Restart the browser every 4 pages to avoid memory leaks
+		if i%4 == 0 {
+			log.WithFields(log.Fields{
+				"page": i,
+			}).Debug("Restarting the browser to avoid memory leaks")
+
+			c.page.MustClose()
+			c.browser.MustClose()
+			c.browser = rod.New().MustConnect()
+			c.page, _ = c.browser.Page(proto.TargetCreateTarget{})
+		}
+
 		url = fmt.Sprintf("https://coomer.su/%s/user/%s?o=%d", source.Service, source.User, i*50)
 		postUrls, err1 := getPostUrls(c.page, url)
 		if err1 != nil {

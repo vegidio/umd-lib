@@ -13,7 +13,7 @@ func main() {
 		TimestampFormat: "2006-01-02 15:04:05.000",
 	})
 
-	u, _ := umd.New("https://coomer.su/fansly/user/354602093266350080", nil, func(ev event.Event) {
+	u, _ := umd.New("https://coomer.su/onlyfans/user/imogenlucie", nil, func(ev event.Event) {
 		switch e := ev.(type) {
 		case event.OnMediaQueried:
 			log.Info("Found ", e.Amount, " media")
