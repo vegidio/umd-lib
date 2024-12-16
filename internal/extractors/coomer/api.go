@@ -21,13 +21,19 @@ func countPages(page *rod.Page, url string) (int, error) {
 	element := "div#paginator-top small"
 	html, err := f.GetHtml(page, url, element)
 	if err != nil {
-		log.Error(err)
+		log.WithFields(log.Fields{
+			"url": url,
+		}).Error("countPages: Failed to get the HTML: ", err)
+
 		return 0, err
 	}
 
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(html))
 	if err != nil {
-		log.Error(err)
+		log.WithFields(log.Fields{
+			"url": url,
+		}).Error("countPages: Failed to parse the HTML: ", err)
+
 		return 0, err
 	}
 
@@ -36,7 +42,10 @@ func countPages(page *rod.Page, url string) (int, error) {
 
 	num, err := strconv.ParseFloat(matches[1], 64)
 	if err != nil {
-		log.Error(err)
+		log.WithFields(log.Fields{
+			"url": url,
+		}).Error("countPages: Failed to convert string to number: ", err)
+
 		return 0, err
 	}
 
@@ -50,13 +59,19 @@ func getPostUrls(page *rod.Page, url string) ([]string, error) {
 	element := "article.post-card"
 	html, err := f.GetHtml(page, url, element)
 	if err != nil {
-		log.Error(err)
+		log.WithFields(log.Fields{
+			"url": url,
+		}).Error("getPostUrls: Failed to get the HTML: ", err)
+
 		return urls, err
 	}
 
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(html))
 	if err != nil {
-		log.Error(err)
+		log.WithFields(log.Fields{
+			"url": url,
+		}).Error("getPostUrls: Failed to parse the HTML: ", err)
+
 		return urls, err
 	}
 
@@ -80,13 +95,19 @@ func getPostMedia(page *rod.Page, url string, service string, user string) ([]mo
 	element := "div.post__published"
 	html, err := f.GetHtml(page, url, element)
 	if err != nil {
-		log.Error(err)
+		log.WithFields(log.Fields{
+			"url": url,
+		}).Error("getPostMedia: Failed to get the HTML: ", err)
+
 		return media, err
 	}
 
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(html))
 	if err != nil {
-		log.Error(err)
+		log.WithFields(log.Fields{
+			"url": url,
+		}).Error("getPostMedia: Failed to parse the HTML: ", err)
+
 		return media, err
 	}
 
@@ -96,7 +117,11 @@ func getPostMedia(page *rod.Page, url string, service string, user string) ([]mo
 
 	parsedTime, err := time.Parse("2006-01-02T15:04:05", dateTime)
 	if err != nil {
-		log.Error(err)
+		log.WithFields(log.Fields{
+			"dateTime": dateTime,
+			"url":      url,
+		}).Error("getPostMedia: Failed to convert string to time: ", err)
+
 		parsedTime = time.Now()
 	}
 

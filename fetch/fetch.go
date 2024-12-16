@@ -5,6 +5,7 @@ import (
 	"github.com/go-resty/resty/v2"
 	"github.com/go-rod/rod"
 	log "github.com/sirupsen/logrus"
+	"io"
 	"net/http"
 	"time"
 )
@@ -20,20 +21,25 @@ type Fetch struct {
 //   - headers: a map of headers to be set on each request.
 //   - retries: the number of retry attempts for failed requests.
 func New(headers map[string]string, retries int) Fetch {
+	logger := log.New()
+	logger.SetOutput(io.Discard)
+
 	return Fetch{
 		client: resty.New().
+			SetLogger(logger).
 			SetHeaders(headers).
 			SetRetryCount(retries).
 			SetRetryWaitTime(0).
 			AddRetryCondition(
 				func(r *resty.Response, err error) bool {
-					if r.StatusCode() == http.StatusTooManyRequests {
+					if err != nil || r.StatusCode() == http.StatusTooManyRequests {
 						sleep := time.Duration(fibonacci(r.Request.Attempt+1)) * time.Second
 
 						log.WithFields(log.Fields{
 							"attempt": r.Request.Attempt,
+							"error":   err,
 							"url":     r.Request.URL,
-						}).Debug("Too many requests; retrying in ", sleep)
+						}).Warn("Error getting data; retrying in ", sleep)
 
 						time.Sleep(sleep)
 						return true
@@ -119,7 +125,7 @@ func (f Fetch) GetHtml(page *rod.Page, url string, element string) (string, erro
 				"element": element,
 				"error":   err,
 				"url":     url,
-			}).Warn("Error getting HTML; retrying in ", sleep)
+			}).Warn("Error getting data; retrying in ", sleep)
 
 			time.Sleep(sleep)
 		}
