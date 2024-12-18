@@ -18,7 +18,7 @@ import (
 var f = fetch.New(nil, 10)
 
 func countPages(page *rod.Page, url string) (int, error) {
-	element := "div#paginator-top small"
+	element := "div#paginator-top"
 	html, err := f.GetHtml(page, url, element)
 	if err != nil {
 		log.WithFields(log.Fields{
@@ -38,6 +38,11 @@ func countPages(page *rod.Page, url string) (int, error) {
 	}
 
 	result := doc.Find("div#paginator-top small").Text()
+
+	if result == "" {
+		return 1, nil
+	}
+
 	matches := regexp.MustCompile(`of (\d+)`).FindStringSubmatch(result)
 
 	num, err := strconv.ParseFloat(matches[1], 64)
