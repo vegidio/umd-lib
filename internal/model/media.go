@@ -70,9 +70,9 @@ func getExtension(urStr string) string {
 
 func getType(extension string) MediaType {
 	switch extension {
-	case "jpg", "jpeg", "png", "gif", "avif":
+	case "avif", "gif", "jpg", "jpeg", "png", "webp":
 		return Image
-	case "gifv", "mp4", "m4v", "webm", "mkv":
+	case "gifv", "m4v", "mkv", "mp4", "webm":
 		return Video
 	default:
 		return Unknown

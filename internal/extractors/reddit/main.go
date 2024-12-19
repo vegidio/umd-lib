@@ -1,8 +1,8 @@
 package reddit
 
 import (
+	"encoding/json"
 	"fmt"
-	"github.com/samber/lo"
 	"github.com/vegidio/umd-lib/event"
 	"github.com/vegidio/umd-lib/fetch"
 	"github.com/vegidio/umd-lib/internal/model"
@@ -158,18 +158,57 @@ func (r *Reddit) fetchMedia(source SourceType, limit int, extensions []string, d
 // region - Private functions
 
 func submissionsToMedia(submissions []Child, sourceName string, name string) []model.Media {
-	return lo.Map(submissions, func(submission Child, _ int) model.Media {
-		url := submission.Data.SecureMedia.RedditVideo.FallbackUrl
-		if url == "" {
-			url = submission.Data.Url
-		}
+	media := make([]model.Media, 0)
 
-		return model.NewMedia(url, model.Reddit, map[string]interface{}{
-			"source":  strings.ToLower(sourceName),
-			"name":    name,
-			"created": submission.Data.Created.Time,
-		})
-	})
+	for _, submission := range submissions {
+		if submission.Data.IsGallery {
+			newMedia := getGalleryMedia(submission, sourceName, name)
+			media = append(media, newMedia...)
+		} else {
+			url := submission.Data.SecureMedia.RedditVideo.FallbackUrl
+			if url == "" {
+				url = submission.Data.Url
+			}
+
+			newMedia := model.NewMedia(url, model.Reddit, map[string]interface{}{
+				"source":  strings.ToLower(sourceName),
+				"name":    name,
+				"created": submission.Data.Created.Time,
+			})
+
+			media = append(media, newMedia)
+		}
+	}
+
+	return media
+}
+
+func getGalleryMedia(submission Child, sourceName string, name string) []model.Media {
+	media := make([]model.Media, 0)
+
+	for _, value := range submission.Data.MediaMetadata {
+		var metadata MediaMetadata
+		jsonData, _ := json.Marshal(value)
+		json.Unmarshal(jsonData, &metadata)
+
+		if metadata.Status == "valid" {
+			url := metadata.S.Image
+			if url == "" {
+				url = metadata.S.Gif
+			}
+
+			newMedia := model.NewMedia(url, model.Reddit, map[string]interface{}{
+				"source":  strings.ToLower(sourceName),
+				"name":    name,
+				"created": submission.Data.Created.Time,
+			})
+
+			newMedia.Url = url
+			media = append(media, newMedia)
+		}
+	}
+
+	return media
 }
 
 // endregion
