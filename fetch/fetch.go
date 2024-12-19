@@ -2,6 +2,7 @@ package fetch
 
 import (
 	"fmt"
+	"github.com/cavaliergopher/grab/v3"
 	"github.com/go-resty/resty/v2"
 	"github.com/go-rod/rod"
 	log "github.com/sirupsen/logrus"
@@ -11,8 +12,9 @@ import (
 )
 
 type Fetch struct {
-	client  *resty.Client
-	retries int
+	restClient *resty.Client
+	grabClient *grab.Client
+	retries    int
 }
 
 // New creates a new Fetch instance with specified headers and retry settings.
@@ -25,7 +27,7 @@ func New(headers map[string]string, retries int) Fetch {
 	logger.SetOutput(io.Discard)
 
 	return Fetch{
-		client: resty.New().
+		restClient: resty.New().
 			SetLogger(logger).
 			SetHeaders(headers).
 			SetRetryCount(retries).
@@ -39,7 +41,7 @@ func New(headers map[string]string, retries int) Fetch {
 							"attempt": r.Request.Attempt,
 							"error":   err,
 							"url":     r.Request.URL,
-						}).Warn("Error getting data; retrying in ", sleep)
+						}).Warn("Failed to get data; retrying in ", sleep)
 
 						time.Sleep(sleep)
 						return true
@@ -48,7 +50,8 @@ func New(headers map[string]string, retries int) Fetch {
 					return false
 				},
 			),
-		retries: retries,
+		grabClient: grab.NewClient(),
+		retries:    retries,
 	}
 }
 
@@ -59,7 +62,7 @@ func New(headers map[string]string, retries int) Fetch {
 //
 // Returns the response body as a string and an error if the request fails.
 func (f Fetch) GetText(url string) (string, error) {
-	resp, err := f.client.R().
+	resp, err := f.restClient.R().
 		Get(url)
 
 	if err != nil {
@@ -134,37 +137,74 @@ func (f Fetch) GetHtml(page *rod.Page, url string, element string) (string, erro
 	return html, err
 }
 
-// DownloadFile performs a GET request to the specified URL and saves the response body to the specified file path.
+// DownloadFile attempts to download a file.
 //
 // Parameters:
-//   - url: the URL to send the GET request to.
-//   - filePath: the path where the response body should be saved.
+//   - request: a *grab.Request containing the file URL and other settings.
 //
-// Returns the size of the downloaded file and an error if the request fails.
-func (f Fetch) DownloadFile(url string, filePath string) (int64, error) {
-	resp, err := f.client.R().
-		SetOutput(filePath).
-		Get(url)
+// Returns:
+//   - *grab.Response: the response from the download.
+func (f Fetch) DownloadFile(request *grab.Request) *grab.Response {
+	var resp *grab.Response
 
-	if err != nil {
-		log.WithFields(log.Fields{
-			"filePath": filePath,
-			"url":      url,
-		}).Debug("Error downloading file: ", err)
+	for attempt := 1; attempt <= f.retries; attempt++ {
+		resp = f.grabClient.Do(request)
 
-		return 0, err
+		if err := resp.Err(); err != nil {
+			sleep := time.Duration(fibonacci(attempt)) * time.Second
+
+			log.WithFields(log.Fields{
+				"attempt": attempt,
+				"error":   err,
+				"url":     resp.Request.URL(),
+			}).Warn("Failed to download file; retrying in ", sleep)
+
+			time.Sleep(sleep)
+		} else {
+			break
+		}
 	}
 
-	if resp.IsError() {
-		log.WithFields(log.Fields{
-			"status": resp.StatusCode(),
-			"url":    url,
-		}).Debug("Error downloading file: ", resp.Status())
+	return resp
+}
 
-		return 0, fmt.Errorf(resp.Status())
+// DownloadFiles attempts to download multiple files in parallel.
+//
+// Parameters:
+//   - requests: a slice of *grab.Request containing the file URLs and other settings.
+//   - parallel: the number of parallel downloads to perform.
+//   - onDownloadComplete: a callback function to be called when a download completes.
+//
+// Returns the total size of all successfully downloaded files.
+func (f Fetch) DownloadFiles(requests []*grab.Request, parallel int, onDownloadComplete func(response *grab.Response)) int64 {
+	totalDownloaded := int64(0)
+	respch := f.grabClient.DoBatch(parallel, requests...)
+
+	for resp := range respch {
+		for attempt := 1; attempt <= 10; attempt++ {
+			if err := resp.Err(); err != nil {
+				sleep := time.Duration(fibonacci(attempt)) * time.Second
+
+				log.WithFields(log.Fields{
+					"attempt": attempt,
+					"error":   err,
+					"url":     resp.Request.URL(),
+				}).Warn("Failed to download file; retrying in ", sleep)
+
+				time.Sleep(sleep)
+				resp = f.grabClient.Do(resp.Request)
+			} else {
+				totalDownloaded += resp.Size()
+				break
+			}
+		}
+
+		if onDownloadComplete != nil {
+			onDownloadComplete(resp)
+		}
 	}
 
-	return resp.Size(), nil
+	return totalDownloaded
 }
 
 // region - Private functions
