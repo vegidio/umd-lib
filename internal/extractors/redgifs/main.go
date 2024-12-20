@@ -67,7 +67,7 @@ var _ model.Extractor = (*Redgifs)(nil)
 // region - Private methods
 
 func (r *Redgifs) getSourceType(url string) (SourceType, error) {
-	regexVideo := regexp.MustCompile(`/watch/([^/\n?]+)`)
+	regexVideo := regexp.MustCompile(`/(ifr|watch)/([^/\n?]+)`)
 
 	var source SourceType
 	var id string
@@ -75,7 +75,7 @@ func (r *Redgifs) getSourceType(url string) (SourceType, error) {
 	switch {
 	case regexVideo.MatchString(url):
 		matches := regexVideo.FindStringSubmatch(url)
-		id = matches[1]
+		id = matches[2]
 		source = SourceVideo{Id: id}
 	}
 
