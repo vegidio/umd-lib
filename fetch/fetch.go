@@ -8,6 +8,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"io"
 	"net/http"
+	"sync"
 	"time"
 )
 
@@ -176,33 +177,37 @@ func (f Fetch) DownloadFile(request *grab.Request) *grab.Response {
 //   - onDownloadComplete: a callback function to be called when a download completes.
 //
 // Returns the total size of all successfully downloaded files.
-func (f Fetch) DownloadFiles(requests []*grab.Request, parallel int, onDownloadComplete func(response *grab.Response)) int64 {
+func (f Fetch) DownloadFiles(
+	requests []*grab.Request,
+	parallel int,
+	onDownloadComplete func(response *grab.Response),
+) int64 {
+	var wg sync.WaitGroup
+	sem := make(chan struct{}, parallel)
 	totalDownloaded := int64(0)
-	respch := f.grabClient.DoBatch(parallel, requests...)
 
-	for resp := range respch {
-		for attempt := 1; attempt <= 10; attempt++ {
-			if err := resp.Err(); err != nil {
-				sleep := time.Duration(fibonacci(attempt)) * time.Second
+	for _, request := range requests {
+		wg.Add(1)
 
-				log.WithFields(log.Fields{
-					"attempt": attempt,
-					"error":   err,
-					"url":     resp.Request.URL(),
-				}).Warn("Failed to download file; retrying in ", sleep)
+		go func(r *grab.Request) {
+			defer func() {
+				<-sem
+				wg.Done()
+			}()
 
-				time.Sleep(sleep)
-				resp = f.grabClient.Do(resp.Request)
-			} else {
-				totalDownloaded += resp.Size()
-				break
+			sem <- struct{}{} // acquire a semaphore token
+			resp := f.DownloadFile(r)
+			totalDownloaded += resp.Size()
+
+			// Send status update to the UI
+			if onDownloadComplete != nil {
+				onDownloadComplete(resp)
 			}
-		}
-
-		if onDownloadComplete != nil {
-			onDownloadComplete(resp)
-		}
+		}(request)
 	}
+
+	wg.Wait()
+	close(sem)
 
 	return totalDownloaded
 }
