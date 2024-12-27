@@ -9,12 +9,16 @@ const (
 	Reddit
 	// RedGifs the RedGifs (redgifs.com) extractor type.
 	RedGifs
+	// Kemono the Kemono (kemono.su) extractor type.
+	Kemono
 )
 
 func (e ExtractorType) String() string {
 	switch e {
 	case Coomer:
 		return "Coomer"
+	case Kemono:
+		return "Kemono"
 	case Reddit:
 		return "Reddit"
 	case RedGifs:

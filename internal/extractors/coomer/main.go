@@ -16,6 +16,8 @@ type Coomer struct {
 	Callback func(event event.Event)
 
 	baseUrl          string
+	extractor        model.ExtractorType
+	services         string
 	responseMetadata model.Metadata
 	external         model.External
 }
@@ -23,9 +25,21 @@ type Coomer struct {
 func New(url string, metadata model.Metadata, callback func(event event.Event)) model.Extractor {
 	switch {
 	case utils.HasHost(url, "coomer.su") || utils.HasHost(url, "coomer.party"):
-		return &Coomer{Metadata: metadata, Callback: callback, baseUrl: "https://coomer.su"}
+		return &Coomer{
+			Metadata:  metadata,
+			Callback:  callback,
+			baseUrl:   "https://coomer.su",
+			extractor: model.Coomer,
+			services:  "onlyfans|fansly|candfans",
+		}
 	case utils.HasHost(url, "kemono.su") || utils.HasHost(url, "kemono.party"):
-		return &Coomer{Metadata: metadata, Callback: callback, baseUrl: "https://kemono.su"}
+		return &Coomer{
+			Metadata:  metadata,
+			Callback:  callback,
+			baseUrl:   "https://kemono.su",
+			extractor: model.Kemono,
+			services:  "patreon|fanbox|discord|fantia|afdian|boosty|gumroad|subscribestar|dlsite",
+		}
 	}
 
 	return nil
@@ -56,7 +70,7 @@ func (c *Coomer) QueryMedia(url string, limit int, extensions []string, deep boo
 	return &model.Response{
 		Url:       url,
 		Media:     media,
-		Extractor: model.Coomer,
+		Extractor: c.extractor,
 		Metadata:  c.responseMetadata,
 	}, nil
 }
@@ -75,8 +89,8 @@ var _ model.Extractor = (*Coomer)(nil)
 // region - Private methods
 
 func (c *Coomer) getSourceType(url string) (SourceType, error) {
-	regexPost := regexp.MustCompile(`(onlyfans|fansly|candfans)/user/([^/]+)/post/([^/\n?]+)`)
-	regexUser := regexp.MustCompile(`(onlyfans|fansly|candfans)/user/([^/\n?]+)`)
+	regexPost := regexp.MustCompile(`(` + c.services + `)/user/([^/]+)/post/([^/\n?]+)`)
+	regexUser := regexp.MustCompile(`(` + c.services + `)/user/([^/\n?]+)`)
 
 	var source SourceType
 	var user string
@@ -181,10 +195,10 @@ func (c *Coomer) postToMedia(post Post) []model.Media {
 
 	if post.File.Path != "" {
 		url := c.baseUrl + post.File.Path
-		newMedia := model.NewMedia(url, model.Coomer, map[string]interface{}{
+		newMedia := model.NewMedia(url, c.extractor, map[string]interface{}{
 			"source":  post.Service,
 			"name":    post.User,
-			"created": post.Published,
+			"created": post.Published.Time,
 		})
 
 		media = append(media, newMedia)
@@ -193,10 +207,10 @@ func (c *Coomer) postToMedia(post Post) []model.Media {
 	for _, attachment := range post.Attachments {
 		if attachment.Path != "" {
 			url := c.baseUrl + attachment.Path
-			newMedia := model.NewMedia(url, model.Coomer, map[string]interface{}{
+			newMedia := model.NewMedia(url, c.extractor, map[string]interface{}{
 				"source":  post.Service,
 				"name":    post.User,
-				"created": post.Published,
+				"created": post.Published.Time,
 			})
 
 			media = append(media, newMedia)
