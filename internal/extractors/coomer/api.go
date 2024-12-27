@@ -2,156 +2,57 @@ package coomer
 
 import (
 	"fmt"
-	"github.com/PuerkitoBio/goquery"
-	"github.com/go-rod/rod"
-	"github.com/samber/lo"
-	log "github.com/sirupsen/logrus"
-	"github.com/vegidio/umd-lib/fetch"
-	"github.com/vegidio/umd-lib/internal/model"
-	"math"
-	"regexp"
-	"strconv"
-	"strings"
-	"time"
+	"github.com/go-resty/resty/v2"
 )
 
-var f = fetch.New(nil, 10)
+var client = resty.New()
 
-func countPages(page *rod.Page, url string) (int, error) {
-	element := "div#paginator-top"
-	html, err := f.GetHtml(page, url, element)
-	if err != nil {
-		log.WithFields(log.Fields{
-			"url": url,
-		}).Error("countPages: Failed to get the HTML: ", err)
-
-		return 0, err
-	}
-
-	doc, err := goquery.NewDocumentFromReader(strings.NewReader(html))
-	if err != nil {
-		log.WithFields(log.Fields{
-			"url": url,
-		}).Error("countPages: Failed to parse the HTML: ", err)
-
-		return 0, err
-	}
-
-	result := doc.Find("div#paginator-top small").Text()
-
-	if result == "" {
-		return 1, nil
-	}
-
-	matches := regexp.MustCompile(`of (\d+)`).FindStringSubmatch(result)
-
-	num, err := strconv.ParseFloat(matches[1], 64)
-	if err != nil {
-		log.WithFields(log.Fields{
-			"url": url,
-		}).Error("countPages: Failed to convert string to number: ", err)
-
-		return 0, err
-	}
-
-	pages := int(math.Ceil(num / 50))
-	return pages, nil
+func setBaseUrl(baseUrl string) {
+	client.SetBaseURL(baseUrl)
 }
 
-func getPostUrls(page *rod.Page, url string) ([]string, error) {
-	urls := make([]string, 0)
+func getUserPosts(service string, user string) ([]Post, error) {
+	posts := make([]Post, 0)
+	offset := 0
 
-	element := "article.post-card"
-	html, err := f.GetHtml(page, url, element)
-	if err != nil {
-		log.WithFields(log.Fields{
-			"url": url,
-		}).Error("getPostUrls: Failed to get the HTML: ", err)
+	for {
+		url := fmt.Sprintf("/api/v1/%s/user/%s?o=%d", service, user, offset)
+		var newPosts []Post
 
-		return urls, err
+		resp, err := client.R().
+			SetResult(&newPosts).
+			Get(url)
+
+		if err != nil {
+			return nil, err
+		} else if resp.IsError() {
+			return nil, fmt.Errorf("error fetching user '%s' posts: %s", user, resp.Status())
+		}
+
+		if len(newPosts) == 0 {
+			break
+		}
+
+		posts = append(posts, newPosts...)
+		offset += 50
 	}
 
-	doc, err := goquery.NewDocumentFromReader(strings.NewReader(html))
-	if err != nil {
-		log.WithFields(log.Fields{
-			"url": url,
-		}).Error("getPostUrls: Failed to parse the HTML: ", err)
-
-		return urls, err
-	}
-
-	return doc.Find(element).
-		Map(func(i int, s *goquery.Selection) string {
-			service, _ := s.Attr("data-service")
-			user, _ := s.Attr("data-user")
-			id, _ := s.Attr("data-id")
-
-			return fmt.Sprintf("https://coomer.su/%s/user/%s/post/%s", service, user, id)
-		}), nil
+	return posts, nil
 }
 
-func getPostMedia(page *rod.Page, url string, service string, user string) ([]model.Media, error) {
-	media := make([]model.Media, 0)
+func getPost(service string, user string, id string) (*Post, error) {
+	url := fmt.Sprintf("/api/v1/%s/user/%s/post/%s", service, user, id)
+	var response *Response
 
-	// Get the post ID
-	index := strings.LastIndex(url, "/")
-	postId := url[index+1:]
+	resp, err := client.R().
+		SetResult(&response).
+		Get(url)
 
-	element := "div.post__published"
-	html, err := f.GetHtml(page, url, element)
 	if err != nil {
-		log.WithFields(log.Fields{
-			"url": url,
-		}).Error("getPostMedia: Failed to get the HTML: ", err)
-
-		return media, err
+		return nil, err
+	} else if resp.IsError() {
+		return nil, fmt.Errorf("error fetching user '%s' posts: %s", user, resp.Status())
 	}
 
-	doc, err := goquery.NewDocumentFromReader(strings.NewReader(html))
-	if err != nil {
-		log.WithFields(log.Fields{
-			"url": url,
-		}).Error("getPostMedia: Failed to parse the HTML: ", err)
-
-		return media, err
-	}
-
-	result := doc.Find(element).Text()
-	matches := regexp.MustCompile(`Published: (.+)`).FindStringSubmatch(result)
-	dateTime := matches[1]
-
-	parsedTime, err := time.Parse("2006-01-02T15:04:05", dateTime)
-	if err != nil {
-		log.WithFields(log.Fields{
-			"dateTime": dateTime,
-			"url":      url,
-		}).Error("getPostMedia: Failed to convert string to time: ", err)
-
-		parsedTime = time.Now()
-	}
-
-	images := doc.Find("a.fileThumb").
-		Map(func(i int, s *goquery.Selection) string {
-			link, _ := s.Attr("href")
-			return link
-		})
-
-	videos := doc.Find("a.post__attachment-link").
-		Map(func(i int, s *goquery.Selection) string {
-			link, _ := s.Attr("href")
-			return link
-		})
-
-	links := append(images, videos...)
-
-	media = lo.Map(links, func(link string, _ int) model.Media {
-		return model.NewMedia(link, model.Coomer, map[string]interface{}{
-			"source":  service,
-			"name":    user,
-			"id":      postId,
-			"created": parsedTime,
-		})
-	})
-
-	return media, nil
+	return response.Post, nil
 }

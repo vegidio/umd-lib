@@ -20,8 +20,13 @@ type Redgifs struct {
 	external         model.External
 }
 
-func IsMatch(url string) bool {
-	return utils.HasHost(url, "redgifs.com")
+func New(url string, metadata model.Metadata, callback func(event event.Event)) model.Extractor {
+	switch {
+	case utils.HasHost(url, "redgifs.com"):
+		return &Redgifs{Metadata: metadata, Callback: callback}
+	}
+
+	return nil
 }
 
 func (r *Redgifs) QueryMedia(url string, limit int, extensions []string, deep bool) (*model.Response, error) {

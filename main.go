@@ -75,14 +75,15 @@ func (u Umd) GetFetch() fetch.Fetch {
 
 func findExtractor(url string, metadata model.Metadata, callback func(event event.Event)) (model.Extractor, error) {
 	var extractor model.Extractor
+	extractors := []func(string, model.Metadata, func(event.Event)) model.Extractor{
+		coomer.New, reddit.New, redgifs.New,
+	}
 
-	switch {
-	case coomer.IsMatch(url):
-		extractor = &coomer.Coomer{Metadata: metadata, Callback: callback}
-	case reddit.IsMatch(url):
-		extractor = &reddit.Reddit{Metadata: metadata, Callback: callback}
-	case redgifs.IsMatch(url):
-		extractor = &redgifs.Redgifs{Metadata: metadata, Callback: callback}
+	for _, newExtractor := range extractors {
+		if e := newExtractor(url, metadata, callback); e != nil {
+			extractor = e
+			break
+		}
 	}
 
 	if extractor == nil {

@@ -2,9 +2,6 @@ package coomer
 
 import (
 	"fmt"
-	"github.com/go-rod/rod"
-	"github.com/go-rod/rod/lib/proto"
-	log "github.com/sirupsen/logrus"
 	"github.com/vegidio/umd-lib/event"
 	"github.com/vegidio/umd-lib/fetch"
 	"github.com/vegidio/umd-lib/internal/model"
@@ -18,27 +15,25 @@ type Coomer struct {
 	Metadata model.Metadata
 	Callback func(event event.Event)
 
+	baseUrl          string
 	responseMetadata model.Metadata
 	external         model.External
-	browser          *rod.Browser
-	page             *rod.Page
 }
 
-func IsMatch(url string) bool {
-	return utils.HasHost(url, "coomer.su")
+func New(url string, metadata model.Metadata, callback func(event event.Event)) model.Extractor {
+	switch {
+	case utils.HasHost(url, "coomer.su") || utils.HasHost(url, "coomer.party"):
+		return &Coomer{Metadata: metadata, Callback: callback, baseUrl: "https://coomer.su"}
+	case utils.HasHost(url, "kemono.su") || utils.HasHost(url, "kemono.party"):
+		return &Coomer{Metadata: metadata, Callback: callback, baseUrl: "https://kemono.su"}
+	}
+
+	return nil
 }
 
 func (c *Coomer) QueryMedia(url string, limit int, extensions []string, deep bool) (*model.Response, error) {
 	var err error
-	c.browser = rod.New().MustConnect()
-	defer c.browser.Close()
-
-	c.page, err = c.browser.Page(proto.TargetCreateTarget{})
-	if err != nil {
-		return nil, err
-	}
-
-	defer c.page.Close()
+	setBaseUrl(c.baseUrl)
 
 	if c.responseMetadata == nil {
 		c.responseMetadata = make(model.Metadata)
@@ -121,8 +116,7 @@ func (c *Coomer) fetchMedia(source SourceType, limit int, extensions []string, _
 	case SourceUser:
 		media, err = c.fetchUserMedia(s, limit, extensions)
 	case SourcePost:
-		url := fmt.Sprintf("https://coomer.su/%s/user/%s/post/%s", s.Service, s.User, s.Id)
-		media, err = getPostMedia(c.page, url, s.Service, s.User)
+		media, err = c.fetchPostMedia(s, limit, extensions)
 	}
 
 	if err != nil {
@@ -141,51 +135,75 @@ func (c *Coomer) fetchUserMedia(source SourceUser, limit int, extensions []strin
 	media := make([]model.Media, 0)
 	amountQueried := 0
 
-	url := fmt.Sprintf("https://coomer.su/%s/user/%s", source.Service, source.User)
-	numPages, err := countPages(c.page, url)
+	posts, err := getUserPosts(source.Service, source.User)
 	if err != nil {
 		return media, err
 	}
 
-outerLoop:
-	for i := 0; i < numPages; i++ {
-		// Restart the browser every 4 pages to avoid memory leaks
-		if i%4 == 0 {
-			log.WithFields(log.Fields{
-				"page": i,
-			}).Debug("Restarting the browser to avoid memory leaks")
+	for _, post := range posts {
+		newMedia := c.postToMedia(post)
 
-			c.page.MustClose()
-			c.browser.MustClose()
-			c.browser = rod.New().MustConnect()
-			c.page, _ = c.browser.Page(proto.TargetCreateTarget{})
+		media, amountQueried = utils.MergeMedia(media, newMedia)
+		if c.Callback != nil && amountQueried > 0 {
+			c.Callback(event.OnMediaQueried{Amount: amountQueried})
 		}
 
-		url = fmt.Sprintf("https://coomer.su/%s/user/%s?o=%d", source.Service, source.User, i*50)
-		postUrls, err1 := getPostUrls(c.page, url)
-		if err1 != nil {
-			return media, err1
-		}
-
-		for _, postUrl := range postUrls {
-			postMedia, err2 := getPostMedia(c.page, postUrl, source.Service, source.User)
-			if err2 != nil {
-				return media, err2
-			}
-
-			media, amountQueried = utils.MergeMedia(media, postMedia)
-
-			if c.Callback != nil && amountQueried > 0 {
-				c.Callback(event.OnMediaQueried{Amount: amountQueried})
-			}
-
-			if len(media) >= limit {
-				break outerLoop
-			}
+		// Limiting the number of results
+		if len(media) > limit {
+			break
 		}
 	}
 
 	return media, nil
+}
+
+func (c *Coomer) fetchPostMedia(source SourcePost, limit int, extensions []string) ([]model.Media, error) {
+	media := make([]model.Media, 0)
+	amountQueried := 0
+
+	post, err := getPost(source.Service, source.User, source.Id)
+	if err != nil {
+		return media, err
+	}
+
+	newMedia := c.postToMedia(*post)
+
+	media, amountQueried = utils.MergeMedia(media, newMedia)
+	if c.Callback != nil && amountQueried > 0 {
+		c.Callback(event.OnMediaQueried{Amount: amountQueried})
+	}
+
+	return media, nil
+}
+
+func (c *Coomer) postToMedia(post Post) []model.Media {
+	media := make([]model.Media, 0)
+
+	if post.File.Path != "" {
+		url := c.baseUrl + post.File.Path
+		newMedia := model.NewMedia(url, model.Coomer, map[string]interface{}{
+			"source":  post.Service,
+			"name":    post.User,
+			"created": post.Published,
+		})
+
+		media = append(media, newMedia)
+	}
+
+	for _, attachment := range post.Attachments {
+		if attachment.Path != "" {
+			url := c.baseUrl + attachment.Path
+			newMedia := model.NewMedia(url, model.Coomer, map[string]interface{}{
+				"source":  post.Service,
+				"name":    post.User,
+				"created": post.Published,
+			})
+
+			media = append(media, newMedia)
+		}
+	}
+
+	return media
 }
 
 // endregion

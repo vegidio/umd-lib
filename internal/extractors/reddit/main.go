@@ -20,8 +20,13 @@ type Reddit struct {
 	external         model.External
 }
 
-func IsMatch(url string) bool {
-	return utils.HasHost(url, "reddit.com")
+func New(url string, metadata model.Metadata, callback func(event event.Event)) model.Extractor {
+	switch {
+	case utils.HasHost(url, "reddit.com"):
+		return &Reddit{Metadata: metadata, Callback: callback}
+	}
+
+	return nil
 }
 
 func (r *Reddit) QueryMedia(url string, limit int, extensions []string, deep bool) (*model.Response, error) {
