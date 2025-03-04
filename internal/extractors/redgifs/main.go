@@ -57,9 +57,7 @@ func (r *Redgifs) QueryMedia(url string, limit int, extensions []string, deep bo
 }
 
 func (r *Redgifs) GetFetch() fetch.Fetch {
-	return fetch.New(map[string]string{
-		"User-Agent": "UMD",
-	}, 0)
+	return fetch.New(nil, 0)
 }
 
 func (r *Redgifs) SetExternal(external model.External) {

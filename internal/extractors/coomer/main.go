@@ -76,7 +76,7 @@ func (c *Coomer) QueryMedia(url string, limit int, extensions []string, deep boo
 }
 
 func (c *Coomer) GetFetch() fetch.Fetch {
-	return fetch.New(make(map[string]string), 10)
+	return fetch.New(nil, 10)
 }
 
 func (c *Coomer) SetExternal(external model.External) {

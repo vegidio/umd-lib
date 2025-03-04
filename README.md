@@ -8,6 +8,7 @@
 It supports the following sites:
 <br/><br/>
 <a href="https://coomer.su" target="_blank"><img src="https://img.shields.io/badge/Coomer-1392F4?&style=for-the-badge&logo=onlyfans&logoColor=white"/></a>
+<a href="https://kemono.su" target="_blank"><img src="https://img.shields.io/badge/Kemono-E6712F?&style=for-the-badge&logo=keystone&logoColor=white"/></a>
 <a href="https://www.reddit.com" target="_blank"><img src="https://img.shields.io/badge/Reddit-FF4500?&style=for-the-badge&logo=reddit&logoColor=white"/></a>
 <a href="https://www.redgifs.com" target="_blank"><img src="https://img.shields.io/badge/RedGifs-764ABC?&style=for-the-badge&logo=codeigniter&logoColor=white"/></a>
 </p>

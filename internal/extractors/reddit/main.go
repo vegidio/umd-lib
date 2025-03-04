@@ -57,7 +57,7 @@ func (r *Reddit) QueryMedia(url string, limit int, extensions []string, deep boo
 }
 
 func (r *Reddit) GetFetch() fetch.Fetch {
-	return fetch.New(make(map[string]string), 0)
+	return fetch.New(nil, 0)
 }
 
 func (r *Reddit) SetExternal(external model.External) {
