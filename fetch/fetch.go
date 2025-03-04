@@ -18,6 +18,9 @@ type Fetch struct {
 	retries    int
 }
 
+var userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) " +
+	"Chrome/133.0.0.0 Safari/537.36"
+
 // New creates a new Fetch instance with specified headers and retry settings.
 //
 // Parameters:
@@ -27,8 +30,13 @@ func New(headers map[string]string, retries int) Fetch {
 	logger := log.New()
 	logger.SetOutput(io.Discard)
 
+	f := resty.New()
+	f.SetHeader("User-Agent", userAgent)
+	g := grab.NewClient()
+	g.UserAgent = userAgent
+
 	return Fetch{
-		restClient: resty.New().
+		restClient: f.
 			SetLogger(logger).
 			SetHeaders(headers).
 			SetRetryCount(retries).
@@ -51,7 +59,8 @@ func New(headers map[string]string, retries int) Fetch {
 					return false
 				},
 			),
-		grabClient: grab.NewClient(),
+
+		grabClient: g,
 		retries:    retries,
 	}
 }
@@ -146,12 +155,11 @@ func (f Fetch) GetHtml(page *rod.Page, url string, element string) (string, erro
 // Returns:
 //   - *grab.Response: the response from the download.
 func (f Fetch) DownloadFile(request *grab.Request) *grab.Response {
-	var resp *grab.Response
+	resp := f.grabClient.Do(request)
+	err := resp.Err()
 
-	for attempt := 1; attempt <= f.retries; attempt++ {
-		resp = f.grabClient.Do(request)
-
-		if err := resp.Err(); err != nil {
+	if err != nil && f.retries > 0 {
+		for attempt := 1; attempt <= f.retries; attempt++ {
 			sleep := time.Duration(fibonacci(attempt)) * time.Second
 
 			log.WithFields(log.Fields{
@@ -161,8 +169,11 @@ func (f Fetch) DownloadFile(request *grab.Request) *grab.Response {
 			}).Warn("Failed to download file; retrying in ", sleep)
 
 			time.Sleep(sleep)
-		} else {
-			break
+
+			resp = f.grabClient.Do(request)
+			if err = resp.Err(); err == nil {
+				break
+			}
 		}
 	}
 

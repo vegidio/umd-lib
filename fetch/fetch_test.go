@@ -1,6 +1,7 @@
 package fetch
 
 import (
+	"github.com/cavaliergopher/grab/v3"
 	"github.com/stretchr/testify/assert"
 	"net/http"
 	"net/http/httptest"
@@ -38,16 +39,17 @@ func TestFetch_DownloadFile(t *testing.T) {
 	defer server.Close()
 
 	fetch := New(nil, 0)
-	filePath := "testfile.txt"
-	size, err := fetch.DownloadFile(server.URL, filePath)
+	request, _ := grab.NewRequest("testfile.txt", server.URL)
+	resp := fetch.DownloadFile(request)
 
-	assert.NoError(t, err)
-	assert.Equal(t, int64(len("file content")), size)
+	assert.NoError(t, resp.Err())
+	assert.Equal(t, int64(len("file content")), resp.Size())
 }
 
 func TestFetch_DownloadFile_Error(t *testing.T) {
-	fetch := New(nil, 0)
-	_, err := fetch.DownloadFile("http://invalid-url", "testfile.txt")
+	fetch := New(nil, 1)
+	request, _ := grab.NewRequest("testfile.txt", "http://invalid-url")
+	resp := fetch.DownloadFile(request)
 
-	assert.Error(t, err)
+	assert.Error(t, resp.Err())
 }
