@@ -2,11 +2,11 @@ package reddit
 
 import (
 	"fmt"
-	"github.com/go-resty/resty/v2"
+	"github.com/vegidio/umd-lib/fetch"
 )
 
-var client = resty.New().
-	SetBaseURL("https://www.reddit.com/")
+var f = fetch.New(nil, 10)
+var baseUrl = "https://www.reddit.com/"
 
 // getSubmission retrieves a list of submissions for a given Reddit post ID.
 //
@@ -19,11 +19,8 @@ var client = resty.New().
 //   - A slice of Submission structs containing the details of the submissions.
 func getSubmission(id string) (*Submission, error) {
 	submissions := make([]Submission, 0)
-	url := fmt.Sprintf("comments/%s.json?raw_json=1", id)
-
-	resp, err := client.R().
-		SetResult(&submissions).
-		Get(url)
+	url := fmt.Sprintf(baseUrl+"comments/%s.json?raw_json=1", id)
+	resp, err := f.GetResult(url, &submissions)
 
 	if err != nil {
 		return nil, err
@@ -48,11 +45,8 @@ func getSubmission(id string) (*Submission, error) {
 //   - A Submission struct containing the details of the submissions.
 func getUserSubmissions(user string, after string, limit int) (*Submission, error) {
 	var submission *Submission
-	url := fmt.Sprintf("user/%s/submitted.json?sort=new&raw_json=1&after=%s&limit=%d", user, after, limit)
-
-	resp, err := client.R().
-		SetResult(&submission).
-		Get(url)
+	url := fmt.Sprintf(baseUrl+"user/%s/submitted.json?sort=new&raw_json=1&after=%s&limit=%d", user, after, limit)
+	resp, err := f.GetResult(url, &submission)
 
 	if err != nil {
 		return nil, err
@@ -76,11 +70,8 @@ func getUserSubmissions(user string, after string, limit int) (*Submission, erro
 //   - A Submission struct containing the details of the submissions.
 func getSubredditSubmissions(subreddit string, after string, limit int) (*Submission, error) {
 	var submission *Submission
-	url := fmt.Sprintf("r/%s/hot.json?raw_json=1&after=%s&limit=%d", subreddit, after, limit)
-
-	resp, err := client.R().
-		SetResult(&submission).
-		Get(url)
+	url := fmt.Sprintf(baseUrl+"r/%s/hot.json?raw_json=1&after=%s&limit=%d", subreddit, after, limit)
+	resp, err := f.GetResult(url, &submission)
 
 	if err != nil {
 		return nil, err

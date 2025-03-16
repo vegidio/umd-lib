@@ -2,26 +2,20 @@ package coomer
 
 import (
 	"fmt"
-	"github.com/go-resty/resty/v2"
+	"github.com/vegidio/umd-lib/fetch"
 )
 
-var client = resty.New()
-
-func setBaseUrl(baseUrl string) {
-	client.SetBaseURL(baseUrl)
-}
+var f = fetch.New(nil, 10)
+var baseUrl string
 
 func getUserPosts(service string, user string) ([]Post, error) {
 	posts := make([]Post, 0)
 	offset := 0
 
 	for {
-		url := fmt.Sprintf("/api/v1/%s/user/%s?o=%d", service, user, offset)
 		var newPosts []Post
-
-		resp, err := client.R().
-			SetResult(&newPosts).
-			Get(url)
+		url := fmt.Sprintf(baseUrl+"/api/v1/%s/user/%s?o=%d", service, user, offset)
+		resp, err := f.GetResult(url, &newPosts)
 
 		if err != nil {
 			return nil, err
@@ -41,12 +35,9 @@ func getUserPosts(service string, user string) ([]Post, error) {
 }
 
 func getPost(service string, user string, id string) (*Post, error) {
-	url := fmt.Sprintf("/api/v1/%s/user/%s/post/%s", service, user, id)
 	var response *Response
-
-	resp, err := client.R().
-		SetResult(&response).
-		Get(url)
+	url := fmt.Sprintf(baseUrl+"/api/v1/%s/user/%s/post/%s", service, user, id)
+	resp, err := f.GetResult(url, &response)
 
 	if err != nil {
 		return nil, err

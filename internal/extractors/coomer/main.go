@@ -47,7 +47,7 @@ func New(url string, metadata model.Metadata, callback func(event event.Event)) 
 
 func (c *Coomer) QueryMedia(url string, limit int, extensions []string, deep bool) (*model.Response, error) {
 	var err error
-	setBaseUrl(c.baseUrl)
+	baseUrl = c.baseUrl
 
 	if c.responseMetadata == nil {
 		c.responseMetadata = make(model.Metadata)

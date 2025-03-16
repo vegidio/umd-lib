@@ -94,6 +94,40 @@ func (f Fetch) GetText(url string) (string, error) {
 	return resp.String(), nil
 }
 
+// GetResult performs a GET request to the specified URL and unmarshals the response body into the provided result
+// interface.
+//
+// Parameters:
+//   - url: the URL to send the GET request to.
+//   - result: a pointer to the variable where the response body will be unmarshalled.
+//
+// Returns:
+//   - *resty.Response: the response from the GET request.
+//   - error: an error if the request fails or the response indicates an error.
+func (f Fetch) GetResult(url string, result interface{}) (*resty.Response, error) {
+	resp, err := f.restClient.R().
+		SetResult(result).
+		Get(url)
+
+	if err != nil {
+		log.WithFields(log.Fields{
+			"url": url,
+		}).Error("Error getting result: ", err)
+
+		return resp, err
+	}
+
+	if resp.IsError() {
+		log.WithFields(log.Fields{
+			"status": resp.StatusCode(),
+		}).Error("Error getting result: ", resp.Status())
+
+		return resp, fmt.Errorf(resp.Status())
+	}
+
+	return resp, nil
+}
+
 // GetHtml uses the browser to perform a GET request to the specified URL and returns the response body as a string.
 //
 // Parameters:
