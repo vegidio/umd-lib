@@ -39,7 +39,7 @@ func New(headers map[string]string, retries int) Fetch {
 		restClient: f.
 			SetLogger(logger).
 			SetHeaders(headers).
-			SetRetryCount(retries).
+			SetRetryCount(max(retries-1, 0)).
 			SetRetryWaitTime(0).
 			AddRetryCondition(
 				func(r *resty.Response, err error) bool {
@@ -50,7 +50,7 @@ func New(headers map[string]string, retries int) Fetch {
 							"attempt": r.Request.Attempt,
 							"error":   err,
 							"url":     r.Request.URL,
-						}).Warn("Failed to get data; retrying in ", sleep)
+						}).Warn("failed to get data; retrying in ", sleep)
 
 						time.Sleep(sleep)
 						return true
@@ -112,7 +112,7 @@ func (f Fetch) GetResult(url string, result interface{}) (*resty.Response, error
 	if err != nil {
 		log.WithFields(log.Fields{
 			"url": url,
-		}).Error("Error getting result: ", err)
+		}).Error("error getting result: ", err)
 
 		return resp, err
 	}
@@ -120,7 +120,7 @@ func (f Fetch) GetResult(url string, result interface{}) (*resty.Response, error
 	if resp.IsError() {
 		log.WithFields(log.Fields{
 			"status": resp.StatusCode(),
-		}).Error("Error getting result: ", resp.Status())
+		}).Error("error getting result: ", resp.Status())
 
 		return resp, fmt.Errorf(resp.Status())
 	}
@@ -194,13 +194,13 @@ func (f Fetch) DownloadFile(request *grab.Request) *grab.Response {
 
 	if err != nil && f.retries > 0 {
 		for attempt := 1; attempt <= f.retries; attempt++ {
-			sleep := time.Duration(fibonacci(attempt)) * time.Second
+			sleep := time.Duration(fibonacci(attempt+1)) * time.Second
 
 			log.WithFields(log.Fields{
 				"attempt": attempt,
 				"error":   err,
 				"url":     resp.Request.URL(),
-			}).Warn("Failed to download file; retrying in ", sleep)
+			}).Warn("failed to download file; retrying in ", sleep)
 
 			time.Sleep(sleep)
 
