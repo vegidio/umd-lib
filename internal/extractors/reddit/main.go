@@ -12,6 +12,8 @@ import (
 	"strings"
 )
 
+const HOST = "reddit.com"
+
 type Reddit struct {
 	Metadata model.Metadata
 	Callback func(event event.Event)
@@ -22,7 +24,7 @@ type Reddit struct {
 
 func New(url string, metadata model.Metadata, callback func(event event.Event)) model.Extractor {
 	switch {
-	case utils.HasHost(url, "reddit.com"):
+	case utils.HasHost(url, HOST):
 		return &Reddit{Metadata: metadata, Callback: callback}
 	}
 
@@ -135,7 +137,7 @@ func (r *Reddit) fetchMedia(source SourceType, limit int, extensions []string, d
 		newMedia := submissionsToMedia(submission.Data.Children, sourceName, name)
 
 		if deep {
-			newMedia = r.external.ExpandMedia(newMedia, &r.responseMetadata, 5)
+			newMedia = r.external.ExpandMedia(newMedia, HOST, &r.responseMetadata, 5)
 		}
 
 		media, amountQueried = utils.MergeMedia(media, newMedia)

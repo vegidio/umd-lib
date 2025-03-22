@@ -102,7 +102,7 @@ func findExtractor(url string, metadata model.Metadata, callback func(event even
 
 type External struct{}
 
-func (External) ExpandMedia(media []model.Media, metadata *model.Metadata, parallel int) []model.Media {
+func (External) ExpandMedia(media []model.Media, ignoreHost string, metadata *model.Metadata, parallel int) []model.Media {
 	result := make([]model.Media, 0)
 
 	var mu sync.Mutex
@@ -120,16 +120,21 @@ func (External) ExpandMedia(media []model.Media, metadata *model.Metadata, paral
 
 			sem <- struct{}{}
 
-			if current.Type == model.Unknown {
+			if current.Type == model.Unknown && !utils.HasHost(current.Url, ignoreHost) {
 				uObj, err := New(current.Url, *metadata, nil)
 				if err != nil {
+					mu.Lock()
 					result = append(result, current)
+					mu.Unlock()
+
 					return
 				}
 
 				resp, err := uObj.QueryMedia(1, make([]string, 0), false)
 				if err != nil {
+					mu.Lock()
 					result = append(result, current)
+					mu.Unlock()
 					return
 				}
 
@@ -141,11 +146,15 @@ func (External) ExpandMedia(media []model.Media, metadata *model.Metadata, paral
 				}
 
 				if len(resp.Media) > 0 {
+					mu.Lock()
 					resp.Media[0] = utils.MergeMetadata(m, resp.Media[0])
 					result = append(result, resp.Media[0])
+					mu.Unlock()
 				}
 			} else {
+				mu.Lock()
 				result = append(result, current)
+				mu.Unlock()
 			}
 		}(m)
 	}
