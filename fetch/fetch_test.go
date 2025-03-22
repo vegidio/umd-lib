@@ -50,11 +50,18 @@ func TestFetch_GetText_TooManyRequests(t *testing.T) {
 }
 
 func TestFetch_GetText_UserAgent(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(r.UserAgent()))
+	}))
+
+	defer server.Close()
+
 	fetch := New(nil, 0)
-	body, err := fetch.GetText("https://httpbin.org/get")
+	body, err := fetch.GetText(server.URL)
 
 	assert.NoError(t, err)
-	assert.Contains(t, body, "Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
+	assert.Contains(t, body, "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko)")
 }
 
 func TestFetch_GetText_Error(t *testing.T) {
@@ -78,6 +85,24 @@ func TestFetch_DownloadFile(t *testing.T) {
 
 	assert.NoError(t, resp.Err())
 	assert.Equal(t, int64(len("file content")), resp.Size())
+}
+
+func TestFetch_DownloadFile_UserAgent(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(r.UserAgent()))
+	}))
+
+	defer server.Close()
+
+	fetch := New(nil, 0)
+	request, _ := grab.NewRequest("testfile.txt", server.URL)
+	resp := fetch.DownloadFile(request)
+
+	assert.NoError(t, resp.Err())
+
+	byteArray, _ := resp.Bytes()
+	assert.Contains(t, string(byteArray), "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko)")
 }
 
 func TestFetch_DownloadFile_TooManyRequests(t *testing.T) {
