@@ -1,52 +1,49 @@
 package redgifs
 
 import (
-	"encoding/json"
 	"fmt"
-	"github.com/PuerkitoBio/goquery"
 	"github.com/vegidio/umd-lib/fetch"
-	"github.com/vegidio/umd-lib/internal/utils"
-	"strings"
-	"time"
 )
+
+const BaseUrl = "https://api.redgifs.com/"
 
 var f = fetch.New(nil, 0)
 
-func getVideo(videoId string) (*Video, error) {
-	html, err := f.GetText(fmt.Sprintf("https://www.redgifs.com/watch/%s", videoId))
-	if err != nil {
-		return nil, err
+func getToken() (*Auth, error) {
+	var auth *Auth
+	url := BaseUrl + "v2/auth/temporary"
+	headers := map[string]string{
+		"Content-Type": "application/json",
+		"Origin":       "https://www.redgifs.com",
+		"Referer":      "https://www.redgifs.com/",
 	}
 
-	doc, err := goquery.NewDocumentFromReader(strings.NewReader(html))
+	resp, err := f.GetResult(url, headers, &auth)
+
 	if err != nil {
 		return nil, err
+	} else if resp.IsError() {
+		return nil, fmt.Errorf("error fetching authorization token: %s", resp.Status())
 	}
 
-	var result map[string]interface{}
-	jsonString := doc.Find("script[type='application/ld+json']").Text()
-	err = json.Unmarshal([]byte(jsonString), &result)
-	if err != nil {
-		return nil, err
-	}
-
-	video := result["video"].(map[string]interface{})
-	file := strings.ReplaceAll(utils.LastRightOf(video["contentUrl"].(string), "/"), "-silent", "")
-
-	return &Video{
-		Author:  video["author"].(string),
-		Url:     fmt.Sprintf("https://files.redgifs.com/%s", file),
-		Created: parseCustomDateTime(video["uploadDate"].(string)),
-	}, nil
+	return auth, nil
 }
 
-func parseCustomDateTime(input string) time.Time {
-	var year, month, day, hour int
-
-	_, err := fmt.Sscanf(input, "%%%d-%%%d-%%%dUTC%%%d:", &year, &month, &day, &hour)
-	if err != nil {
-		return time.Now()
+func getVideo(token string, videoUrl string, videoId string) (*Video, error) {
+	var video *Video
+	url := BaseUrl + fmt.Sprintf("v2/gifs/%s?views=yes", videoId)
+	headers := map[string]string{
+		"Authorization":  token,
+		"X-CustomHeader": videoUrl,
 	}
 
-	return time.Date(year, time.Month(month), day, hour, 0, 0, 0, time.UTC)
+	resp, err := f.GetResult(url, headers, &video)
+
+	if err != nil {
+		return nil, err
+	} else if resp.IsError() {
+		return nil, fmt.Errorf("error fetching video ID '%s': %s", videoId, resp.Status())
+	}
+
+	return video, nil
 }

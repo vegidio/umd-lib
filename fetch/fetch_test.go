@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 )
@@ -50,7 +51,7 @@ func TestFetch_GetText_TooManyRequests(t *testing.T) {
 
 	// Check the log output
 	output := buf.String()
-	assert.Equal(t, strings.Count(output, "failed to get data; retrying in"), RetryCount)
+	assert.Equal(t, RetryCount, strings.Count(output, "failed to get data; retrying in"))
 
 	assert.Errorf(t, err, "429 Too Many Requests")
 	assert.Equal(t, "", body)
@@ -113,6 +114,10 @@ func TestFetch_GetResult_SetHeaders(t *testing.T) {
 }
 
 func TestFetch_DownloadFile(t *testing.T) {
+	// Delete any previous file before continuing
+	const FilePath = "testfile.txt"
+	_ = os.Remove(FilePath)
+
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("file content"))
@@ -121,7 +126,7 @@ func TestFetch_DownloadFile(t *testing.T) {
 	defer server.Close()
 
 	fetch := New(nil, 0)
-	request, _ := grab.NewRequest("testfile.txt", server.URL)
+	request, _ := grab.NewRequest(FilePath, server.URL)
 	resp := fetch.DownloadFile(request)
 
 	assert.NoError(t, resp.Err())
@@ -129,6 +134,10 @@ func TestFetch_DownloadFile(t *testing.T) {
 }
 
 func TestFetch_DownloadFile_UserAgent(t *testing.T) {
+	// Delete any previous file before continuing
+	const FilePath = "testfile.txt"
+	_ = os.Remove(FilePath)
+
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(r.UserAgent()))
@@ -137,7 +146,7 @@ func TestFetch_DownloadFile_UserAgent(t *testing.T) {
 	defer server.Close()
 
 	fetch := New(nil, 0)
-	request, _ := grab.NewRequest("testfile.txt", server.URL)
+	request, _ := grab.NewRequest(FilePath, server.URL)
 	resp := fetch.DownloadFile(request)
 
 	assert.NoError(t, resp.Err())
@@ -151,6 +160,10 @@ func TestFetch_DownloadFile_TooManyRequests(t *testing.T) {
 	var buf bytes.Buffer
 	log.SetOutput(&buf)
 
+	// Delete any previous file before continuing
+	const FilePath = "testfile.txt"
+	_ = os.Remove(FilePath)
+
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusTooManyRequests)
 		w.Write([]byte("file content"))
@@ -160,7 +173,7 @@ func TestFetch_DownloadFile_TooManyRequests(t *testing.T) {
 
 	const RetryCount = 3
 	fetch := New(nil, RetryCount)
-	request, _ := grab.NewRequest("testfile.txt", server.URL)
+	request, _ := grab.NewRequest(FilePath, server.URL)
 	resp := fetch.DownloadFile(request)
 
 	// Check the log output
@@ -172,8 +185,12 @@ func TestFetch_DownloadFile_TooManyRequests(t *testing.T) {
 }
 
 func TestFetch_DownloadFile_Error(t *testing.T) {
+	// Delete any previous file before continuing
+	const FilePath = "testfile.txt"
+	_ = os.Remove(FilePath)
+
 	fetch := New(nil, 0)
-	request, _ := grab.NewRequest("testfile.txt", "http://invalid-url")
+	request, _ := grab.NewRequest(FilePath, "http://invalid-url")
 	resp := fetch.DownloadFile(request)
 
 	assert.Error(t, resp.Err())

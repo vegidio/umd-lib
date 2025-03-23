@@ -3,6 +3,7 @@ package redgifs
 import (
 	"fmt"
 	"github.com/samber/lo"
+	log "github.com/sirupsen/logrus"
 	"github.com/vegidio/umd-lib/event"
 	"github.com/vegidio/umd-lib/fetch"
 	"github.com/vegidio/umd-lib/internal/model"
@@ -94,36 +95,76 @@ func (r *Redgifs) getSourceType(url string) (SourceType, error) {
 	return source, nil
 }
 
-func (r *Redgifs) fetchMedia(source SourceType, limit int, extensions []string, _ bool) ([]model.Media, error) {
+func (r *Redgifs) getNewOrSavedToken() (string, error) {
+	token, exists := r.Metadata[model.RedGifs]["token"].(string)
+
+	if !exists {
+		log.Debug("Issuing new RedGifs token")
+
+		auth, err := getToken()
+		if err != nil {
+			log.WithFields(log.Fields{
+				"error": err,
+			}).Error("Failed to issue RedGifs token")
+
+			return "", err
+		}
+
+		token = auth.Token
+
+		if r.responseMetadata[model.RedGifs] == nil {
+			r.responseMetadata[model.RedGifs] = make(map[string]interface{})
+		}
+
+		// Save the token to be reused in the future
+		r.responseMetadata[model.RedGifs]["token"] = token
+	} else {
+		log.WithFields(log.Fields{
+			"token": token,
+		}).Debug("Reusing RedGifs token")
+	}
+
+	return token, nil
+}
+
+func (r *Redgifs) fetchMedia(source SourceType, limit int, extensions []string, deep bool) ([]model.Media, error) {
 	media := make([]model.Media, 0)
 	videos := make([]Video, 0)
 	amountQueried := 0
 	var err error
 
-	sourceName := strings.TrimPrefix(reflect.TypeOf(source).Name(), "Source")
-	id := reflect.ValueOf(source).FieldByName("Id").String()
+	token, err := r.getNewOrSavedToken()
+	if err != nil {
+		return nil, err
+	}
 
 	switch s := source.(type) {
 	case SourceVideo:
-		videos, err = r.fetchVideo(s)
+		videos, err = r.fetchVideo(s, token)
 	}
 
 	if err != nil {
 		return media, err
 	}
 
-	newMedia := videosToMedia(videos, sourceName, id)
+	sourceName := strings.TrimPrefix(reflect.TypeOf(source).Name(), "Source")
+	newMedia := videosToMedia(videos, sourceName)
 	media, amountQueried = utils.MergeMedia(media, newMedia)
 
 	if r.Callback != nil {
 		r.Callback(event.OnMediaQueried{Amount: amountQueried})
 	}
 
+	media = append(media, newMedia...)
 	return media, nil
 }
 
-func (r *Redgifs) fetchVideo(source SourceVideo) ([]Video, error) {
-	video, err := getVideo(source.Id)
+func (r *Redgifs) fetchVideo(source SourceVideo, token string) ([]Video, error) {
+	video, err := getVideo(
+		fmt.Sprintf("Bearer %s", token),
+		fmt.Sprintf("https://www.redgifs.com/watch/%s", source.Id),
+		source.Id,
+	)
 
 	if err != nil {
 		return make([]Video, 0), err
@@ -136,13 +177,13 @@ func (r *Redgifs) fetchVideo(source SourceVideo) ([]Video, error) {
 
 // region - Private functions
 
-func videosToMedia(videos []Video, sourceName string, id string) []model.Media {
+func videosToMedia(videos []Video, sourceName string) []model.Media {
 	return lo.Map(videos, func(video Video, _ int) model.Media {
-		return model.NewMedia(video.Url, model.RedGifs, map[string]interface{}{
-			"name":    video.Author,
+		return model.NewMedia(video.Gif.Url.Hd, model.RedGifs, map[string]interface{}{
+			"name":    video.Gif.Username,
 			"source":  strings.ToLower(sourceName),
-			"created": video.Created,
-			"id":      id,
+			"created": video.Gif.Created,
+			"id":      video.Gif.Id,
 		})
 	})
 }

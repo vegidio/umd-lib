@@ -5,8 +5,9 @@ import (
 	"github.com/vegidio/umd-lib/fetch"
 )
 
+const BaseUrl = "https://www.reddit.com/"
+
 var f = fetch.New(nil, 10)
-var baseUrl = "https://www.reddit.com/"
 
 // getSubmission retrieves a list of submissions for a given Reddit post ID.
 //
@@ -19,7 +20,7 @@ var baseUrl = "https://www.reddit.com/"
 //   - A slice of Submission structs containing the details of the submissions.
 func getSubmission(id string) (*Submission, error) {
 	submissions := make([]Submission, 0)
-	url := fmt.Sprintf(baseUrl+"comments/%s.json?raw_json=1", id)
+	url := fmt.Sprintf(BaseUrl+"comments/%s.json?raw_json=1", id)
 	resp, err := f.GetResult(url, nil, &submissions)
 
 	if err != nil {
@@ -45,7 +46,7 @@ func getSubmission(id string) (*Submission, error) {
 //   - A Submission struct containing the details of the submissions.
 func getUserSubmissions(user string, after string, limit int) (*Submission, error) {
 	var submission *Submission
-	url := fmt.Sprintf(baseUrl+"user/%s/submitted.json?sort=new&raw_json=1&after=%s&limit=%d", user, after, limit)
+	url := fmt.Sprintf(BaseUrl+"user/%s/submitted.json?sort=new&raw_json=1&after=%s&limit=%d", user, after, limit)
 	resp, err := f.GetResult(url, nil, &submission)
 
 	if err != nil {
@@ -70,7 +71,7 @@ func getUserSubmissions(user string, after string, limit int) (*Submission, erro
 //   - A Submission struct containing the details of the submissions.
 func getSubredditSubmissions(subreddit string, after string, limit int) (*Submission, error) {
 	var submission *Submission
-	url := fmt.Sprintf(baseUrl+"r/%s/hot.json?raw_json=1&after=%s&limit=%d", subreddit, after, limit)
+	url := fmt.Sprintf(BaseUrl+"r/%s/hot.json?raw_json=1&after=%s&limit=%d", subreddit, after, limit)
 	resp, err := f.GetResult(url, nil, &submission)
 
 	if err != nil {

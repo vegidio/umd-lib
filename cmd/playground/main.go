@@ -7,13 +7,13 @@ import (
 )
 
 func main() {
-	log.SetLevel(log.DebugLevel)
+	//log.SetLevel(log.DebugLevel)
 	log.SetFormatter(&log.TextFormatter{
 		FullTimestamp:   true,
 		TimestampFormat: "2006-01-02 15:04:05.000",
 	})
 
-	u, _ := umd.New("https://coomer.su/onlyfans/user/belledelphine", nil, func(ev event.Event) {
+	u, _ := umd.New("https://www.reddit.com/user/atomicbrunette18/", nil, func(ev event.Event) {
 		switch e := ev.(type) {
 		case event.OnMediaQueried:
 			log.Info("Found ", e.Amount, " media")
@@ -26,5 +26,5 @@ func main() {
 		return
 	}
 
-	log.Info(len(resp.Media))
+	log.Info("Media found: ", len(resp.Media))
 }
