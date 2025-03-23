@@ -39,11 +39,11 @@ func New(headers map[string]string, retries int) Fetch {
 		restClient: f.
 			SetLogger(logger).
 			SetHeaders(headers).
-			SetRetryCount(max(retries-1, 0)).
+			SetRetryCount(retries).
 			SetRetryWaitTime(0).
 			AddRetryCondition(
 				func(r *resty.Response, err error) bool {
-					if err != nil || r.StatusCode() == http.StatusTooManyRequests {
+					if r.StatusCode() == http.StatusTooManyRequests && r.Request.Attempt <= retries {
 						sleep := time.Duration(fibonacci(r.Request.Attempt+1)) * time.Second
 
 						log.WithFields(log.Fields{
@@ -104,8 +104,9 @@ func (f Fetch) GetText(url string) (string, error) {
 // Returns:
 //   - *resty.Response: the response from the GET request.
 //   - error: an error if the request fails or the response indicates an error.
-func (f Fetch) GetResult(url string, result interface{}) (*resty.Response, error) {
+func (f Fetch) GetResult(url string, headers map[string]string, result interface{}) (*resty.Response, error) {
 	resp, err := f.restClient.R().
+		SetHeaders(headers).
 		SetResult(result).
 		Get(url)
 

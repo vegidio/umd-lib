@@ -15,7 +15,7 @@ func getUserPosts(service string, user string) ([]Post, error) {
 	for {
 		var newPosts []Post
 		url := fmt.Sprintf(baseUrl+"/api/v1/%s/user/%s?o=%d", service, user, offset)
-		resp, err := f.GetResult(url, &newPosts)
+		resp, err := f.GetResult(url, nil, &newPosts)
 
 		if err != nil {
 			return nil, err
@@ -37,7 +37,7 @@ func getUserPosts(service string, user string) ([]Post, error) {
 func getPost(service string, user string, id string) (*Post, error) {
 	var response *Response
 	url := fmt.Sprintf(baseUrl+"/api/v1/%s/user/%s/post/%s", service, user, id)
-	resp, err := f.GetResult(url, &response)
+	resp, err := f.GetResult(url, nil, &response)
 
 	if err != nil {
 		return nil, err

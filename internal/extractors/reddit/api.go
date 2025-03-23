@@ -20,7 +20,7 @@ var baseUrl = "https://www.reddit.com/"
 func getSubmission(id string) (*Submission, error) {
 	submissions := make([]Submission, 0)
 	url := fmt.Sprintf(baseUrl+"comments/%s.json?raw_json=1", id)
-	resp, err := f.GetResult(url, &submissions)
+	resp, err := f.GetResult(url, nil, &submissions)
 
 	if err != nil {
 		return nil, err
@@ -46,7 +46,7 @@ func getSubmission(id string) (*Submission, error) {
 func getUserSubmissions(user string, after string, limit int) (*Submission, error) {
 	var submission *Submission
 	url := fmt.Sprintf(baseUrl+"user/%s/submitted.json?sort=new&raw_json=1&after=%s&limit=%d", user, after, limit)
-	resp, err := f.GetResult(url, &submission)
+	resp, err := f.GetResult(url, nil, &submission)
 
 	if err != nil {
 		return nil, err
@@ -71,7 +71,7 @@ func getUserSubmissions(user string, after string, limit int) (*Submission, erro
 func getSubredditSubmissions(subreddit string, after string, limit int) (*Submission, error) {
 	var submission *Submission
 	url := fmt.Sprintf(baseUrl+"r/%s/hot.json?raw_json=1&after=%s&limit=%d", subreddit, after, limit)
-	resp, err := f.GetResult(url, &submission)
+	resp, err := f.GetResult(url, nil, &submission)
 
 	if err != nil {
 		return nil, err
