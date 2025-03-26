@@ -1,20 +1,15 @@
 package model
 
-type MediaType int
-
-const (
-	Image MediaType = iota
-	Video
-	Unknown
-)
-
-func (m MediaType) String() string {
-	switch m {
-	case Image:
-		return "Image"
-	case Video:
-		return "Video"
-	default:
-		return "Unknown"
-	}
+type MediaType struct {
+	value string
 }
+
+func (t MediaType) String() string {
+	return t.value
+}
+
+var (
+	Image   = MediaType{"Image"}
+	Video   = MediaType{"Video"}
+	Unknown = MediaType{"Unknown"}
+)

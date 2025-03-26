@@ -5,6 +5,7 @@ import (
 	"github.com/vegidio/umd-lib/event"
 	"github.com/vegidio/umd-lib/fetch"
 	"github.com/vegidio/umd-lib/internal/extractors/coomer"
+	"github.com/vegidio/umd-lib/internal/extractors/imaglr"
 	"github.com/vegidio/umd-lib/internal/extractors/reddit"
 	"github.com/vegidio/umd-lib/internal/extractors/redgifs"
 	"github.com/vegidio/umd-lib/internal/model"
@@ -76,7 +77,7 @@ func (u Umd) GetFetch() fetch.Fetch {
 func findExtractor(url string, metadata model.Metadata, callback func(event event.Event)) (model.Extractor, error) {
 	var extractor model.Extractor
 	extractors := []func(string, model.Metadata, func(event.Event)) model.Extractor{
-		coomer.New, reddit.New, redgifs.New,
+		coomer.New, imaglr.New, reddit.New, redgifs.New,
 	}
 
 	for _, newExtractor := range extractors {

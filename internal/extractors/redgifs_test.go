@@ -7,11 +7,16 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/vegidio/umd-lib"
 	"github.com/vegidio/umd-lib/fetch"
+	"os"
 	"strings"
 	"testing"
 )
 
 func TestRedGifs_DownloadVideo(t *testing.T) {
+	// Delete any previous file before continuing
+	const FilePath = "video.mp4"
+	_ = os.Remove(FilePath)
+	
 	u, _ := umd.New("https://www.redgifs.com/watch/sturdycuddlyicefish", nil, nil)
 	resp, _ := u.QueryMedia(99999, nil, true)
 
