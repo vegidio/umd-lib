@@ -154,8 +154,7 @@ func (r *Redgifs) fetchMedia(source SourceType, limit int, extensions []string, 
 	if r.Callback != nil {
 		r.Callback(event.OnMediaQueried{Amount: amountQueried})
 	}
-
-	media = append(media, newMedia...)
+	
 	return media, nil
 }
 
