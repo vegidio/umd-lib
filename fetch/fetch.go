@@ -86,6 +86,7 @@ func (f Fetch) GetText(url string) (string, error) {
 	if resp.IsError() {
 		log.WithFields(log.Fields{
 			"status": resp.StatusCode(),
+			"url":    url,
 		}).Error("Error getting text: ", resp.Status())
 
 		return "", fmt.Errorf(resp.Status())

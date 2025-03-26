@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/url"
 	"path"
+	"strings"
 )
 
 // Media represents a media object.
@@ -69,10 +70,12 @@ func getExtension(urStr string) string {
 }
 
 func getType(extension string) MediaType {
-	switch extension {
+	lowerExt := strings.ToLower(extension)
+
+	switch lowerExt {
 	case "avif", "gif", "jpg", "jpeg", "png", "webp":
 		return Image
-	case "gifv", "m4v", "mkv", "mp4", "webm":
+	case "gifv", "m4v", "mkv", "mov", "mp4", "webm":
 		return Video
 	default:
 		return Unknown
