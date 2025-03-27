@@ -20,7 +20,7 @@ func main() {
 		}
 	})
 
-	resp, err := u.QueryMedia(99999, nil, true)
+	resp, err := u.QueryMedia(10, nil, true)
 	if err != nil {
 		log.Error(err)
 		return

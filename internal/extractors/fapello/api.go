@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/PuerkitoBio/goquery"
 	"github.com/vegidio/umd-lib/fetch"
+	"math"
 	"regexp"
 	"strconv"
 	"strings"
@@ -13,55 +14,82 @@ const BaseUrl = "https://fapello.com/"
 
 var f = fetch.New(nil, 0)
 
-func getPages(name string) (int, error) {
+func getLinks(name string, limit int) ([]string, error) {
+	links := make([]string, 0)
+	numPages := 1
+
 	url := BaseUrl + name
 	html, err := f.GetText(url)
 	if err != nil {
-		return 0, err
+		return links, err
 	}
 
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(html))
 	if err != nil {
-		return 0, err
+		return links, err
 	}
 
-	pages, _ := doc.Find("div#showmore").Attr("data-max")
-	numPages, err := strconv.Atoi(pages)
-	if err != nil {
-		return 0, err
+	showMore := doc.Find("div#showmore")
+	if showMore.Length() > 0 {
+		maxPages := math.Ceil(float64(limit) / 32)
+
+		pages, _ := doc.Find("div#showmore").Attr("data-max")
+		pagesF, errF := strconv.ParseFloat(pages, 64)
+		if errF != nil {
+			return links, errF
+		}
+
+		numPages = int(math.Min(pagesF, maxPages))
 	}
 
-	return numPages, nil
+	for i := 1; i <= numPages; i++ {
+		pageUrl := fmt.Sprintf("%s/ajax/model/%s/page-%d/", BaseUrl, name, i)
+		html, err = f.GetText(pageUrl)
+		if err != nil {
+			return links, err
+		}
+
+		doc, err = goquery.NewDocumentFromReader(strings.NewReader(html))
+		if err != nil {
+			return links, err
+		}
+
+		doc.Find("img.object-cover").Each(func(i int, s *goquery.Selection) {
+			parentLink, _ := s.ParentsFiltered("a").Attr("href")
+			links = append(links, parentLink)
+		})
+	}
+
+	return links, nil
 }
 
-func getPosts(name string, page int) ([]Post, error) {
-	posts := make([]Post, 0)
+func getPost(url string, name string) (*Post, error) {
+	mediaUrl := ""
 
-	pageUrl := fmt.Sprintf("%s/ajax/model/%s/page-%d/", BaseUrl, name, page)
-	html, err := f.GetText(pageUrl)
+	matches := regexp.MustCompile(`/(\d+)/?$`).FindStringSubmatch(url)
+	id, _ := strconv.Atoi(matches[1])
+
+	html, err := f.GetText(url)
 	if err != nil {
-		return posts, err
+		return nil, err
 	}
 
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(html))
 	if err != nil {
-		return posts, err
+		return nil, err
 	}
 
-	doc.Find("img.object-cover").Each(func(i int, s *goquery.Selection) {
-		parentLink, _ := s.ParentsFiltered("a").Attr("href")
-		matches := regexp.MustCompile(`/(\d+)/?$`).FindStringSubmatch(parentLink)
-		id, _ := strconv.Atoi(matches[1])
+	videoTag := doc.Find("video.uk-align-center")
 
-		link, _ := s.Attr("src")
-		url := strings.Replace(link, "_300px.", ".", 1)
+	if videoTag.Length() > 0 {
+		mediaUrl, _ = videoTag.Find("source").Attr("src")
+	} else {
+		mediaUrl, _ = doc.Find("div.flex.justify-between.items-center > a").Attr("href")
+	}
 
-		posts = append(posts, Post{
-			Id:   id,
-			Name: name,
-			Url:  url,
-		})
-	})
-
-	return posts, nil
+	return &Post{
+		Id:   id,
+		Name: name,
+		Url:  mediaUrl,
+	}, nil
 }

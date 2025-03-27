@@ -2,7 +2,6 @@ package fapello
 
 import (
 	"fmt"
-	"github.com/samber/lo"
 	"github.com/vegidio/umd-lib/event"
 	"github.com/vegidio/umd-lib/fetch"
 	"github.com/vegidio/umd-lib/internal/model"
@@ -52,7 +51,7 @@ func (r *Fapello) QueryMedia(url string, limit int, extensions []string, deep bo
 	return &model.Response{
 		Url:       url,
 		Media:     media,
-		Extractor: model.Imaglr,
+		Extractor: model.Fapello,
 		Metadata:  r.responseMetadata,
 	}, nil
 }
@@ -101,37 +100,46 @@ func (r *Fapello) fetchMedia(source SourceType, limit int, extensions []string, 
 
 	switch s := source.(type) {
 	case SourceModel:
-		media, err = r.fetchModel(s)
+		media, err = r.fetchModel(s, limit)
 	}
 
 	if err != nil {
 		return media, err
+	}
+
+	// Limiting the number of results
+	if len(media) > limit {
+		media = media[:limit]
 	}
 
 	return media, nil
 }
 
-func (r *Fapello) fetchModel(source SourceModel) ([]model.Media, error) {
+func (r *Fapello) fetchModel(source SourceModel, limit int) ([]model.Media, error) {
 	media := make([]model.Media, 0)
 	amountQueried := 0
 	var err error
 
-	pages, err := getPages(source.Name)
+	links, err := getLinks(source.Name, limit)
 	if err != nil {
 		return media, err
 	}
 
-	for i := 1; i <= pages; i++ {
-		posts, postsErr := getPosts(source.Name, i)
-		if postsErr != nil {
+	for _, link := range links {
+		post, postErr := getPost(link, source.Name)
+		if postErr != nil {
 			return media, err
 		}
 
-		newMedia := postsToMedia(posts, "model")
+		newMedia := postsToMedia(*post, "model")
 		media, amountQueried = utils.MergeMedia(media, newMedia)
 
 		if r.Callback != nil {
 			r.Callback(event.OnMediaQueried{Amount: amountQueried})
+		}
+
+		if len(media) >= limit {
+			break
 		}
 	}
 
@@ -142,17 +150,15 @@ func (r *Fapello) fetchModel(source SourceModel) ([]model.Media, error) {
 
 // region - Private functions
 
-func postsToMedia(posts []Post, sourceName string) []model.Media {
+func postsToMedia(post Post, sourceName string) []model.Media {
 	now := time.Date(1980, time.October, 6, 17, 7, 0, 0, time.UTC)
 
-	return lo.Map(posts, func(post Post, _ int) model.Media {
-		return model.NewMedia(post.Url, model.Fapello, map[string]interface{}{
-			"id":      post.Id,
-			"name":    post.Name,
-			"source":  strings.ToLower(sourceName),
-			"created": now.Add(time.Duration(post.Id*24) * time.Hour),
-		})
-	})
+	return []model.Media{model.NewMedia(post.Url, model.Fapello, map[string]interface{}{
+		"id":      post.Id,
+		"name":    post.Name,
+		"source":  strings.ToLower(sourceName),
+		"created": now.Add(time.Duration(post.Id*24) * time.Hour),
+	})}
 }
 
 // endregion
