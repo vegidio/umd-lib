@@ -122,6 +122,7 @@ func (f Fetch) GetResult(url string, headers map[string]string, result interface
 	if resp.IsError() {
 		log.WithFields(log.Fields{
 			"status": resp.StatusCode(),
+			"url":    url,
 		}).Error("error getting result: ", resp.Status())
 
 		return resp, fmt.Errorf(resp.Status())
