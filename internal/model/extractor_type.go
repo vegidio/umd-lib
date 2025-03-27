@@ -5,6 +5,8 @@ type ExtractorType int
 const (
 	// Coomer represents the Coomer (coomer.su) extractor type.
 	Coomer ExtractorType = iota
+	// Fapello represents the Fapello (fapello.com) extractor type.
+	Fapello
 	// Imaglr represents the Imaglr (imaglr.com) extractor type.
 	Imaglr
 	// Reddit represents the Reddit (reddit.com) extractor type.
@@ -19,6 +21,8 @@ func (e ExtractorType) String() string {
 	switch e {
 	case Coomer:
 		return "Coomer"
+	case Fapello:
+		return "Fapello"
 	case Imaglr:
 		return "Imaglr"
 	case Kemono:

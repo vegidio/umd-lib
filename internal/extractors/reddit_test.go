@@ -46,7 +46,7 @@ func TestReddit_QuerySingleSubmission(t *testing.T) {
 	if os.Getenv("GITHUB_ACTIONS") == "true" {
 		t.Skip("This test doesn't work when executed from GitHub Actions")
 	}
-	
+
 	u, _ := umd.New("https://www.reddit.com/r/needysluts/comments/1aenk3e/if_im_wearing_this_for_our_date_you_have_bo/", nil, nil)
 	resp, err := u.QueryMedia(99999, nil, true)
 	media := resp.Media
