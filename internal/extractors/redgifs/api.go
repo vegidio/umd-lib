@@ -29,15 +29,15 @@ func getToken() (*Auth, error) {
 	return auth, nil
 }
 
-func getVideo(token string, videoUrl string, videoId string) (*Video, error) {
-	var video *Video
+func getGif(token string, videoUrl string, videoId string) (*GifResponse, error) {
+	var response *GifResponse
 	url := BaseUrl + fmt.Sprintf("v2/gifs/%s?views=yes", videoId)
 	headers := map[string]string{
 		"Authorization":  token,
 		"X-CustomHeader": videoUrl,
 	}
 
-	resp, err := f.GetResult(url, headers, &video)
+	resp, err := f.GetResult(url, headers, &response)
 
 	if err != nil {
 		return nil, err
@@ -45,5 +45,24 @@ func getVideo(token string, videoUrl string, videoId string) (*Video, error) {
 		return nil, fmt.Errorf("error fetching video ID '%s': %s", videoId, resp.Status())
 	}
 
-	return video, nil
+	return response, nil
+}
+
+func getUser(token string, userUrl string, userName string, page int) (*UserResponse, error) {
+	var response *UserResponse
+	url := BaseUrl + fmt.Sprintf("v2/users/%s/search?page=%d&count=100&order=latest&type=a&views=yes", userName, page)
+	headers := map[string]string{
+		"Authorization":  token,
+		"X-CustomHeader": userUrl,
+	}
+
+	resp, err := f.GetResult(url, headers, &response)
+
+	if err != nil {
+		return nil, err
+	} else if resp.IsError() {
+		return nil, fmt.Errorf("error fetching username '%s': %s", userName, resp.Status())
+	}
+
+	return response, nil
 }

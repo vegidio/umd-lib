@@ -8,6 +8,7 @@ import (
 	"github.com/vegidio/umd-lib/fetch"
 	"github.com/vegidio/umd-lib/internal/model"
 	"github.com/vegidio/umd-lib/internal/utils"
+	"math"
 	"reflect"
 	"regexp"
 	"strings"
@@ -72,15 +73,20 @@ var _ model.Extractor = (*Redgifs)(nil)
 
 func (r *Redgifs) getSourceType(url string) (SourceType, error) {
 	regexVideo := regexp.MustCompile(`/(ifr|watch)/([^/\n?]+)`)
+	regexUser := regexp.MustCompile(`/users/([^/\n?]+)`)
 
 	var source SourceType
-	var id string
+	var name string
 
 	switch {
 	case regexVideo.MatchString(url):
 		matches := regexVideo.FindStringSubmatch(url)
-		id = matches[2]
-		source = SourceVideo{Id: id}
+		name = matches[2]
+		source = SourceVideo{Id: name}
+	case regexUser.MatchString(url):
+		matches := regexUser.FindStringSubmatch(url)
+		name = matches[1]
+		source = SourceUser{Name: name}
 	}
 
 	if source == nil {
@@ -89,7 +95,7 @@ func (r *Redgifs) getSourceType(url string) (SourceType, error) {
 
 	if r.Callback != nil {
 		sourceType := strings.TrimPrefix(reflect.TypeOf(source).Name(), "Source")
-		r.Callback(event.OnExtractorTypeFound{Type: sourceType, Name: id})
+		r.Callback(event.OnExtractorTypeFound{Type: sourceType, Name: name})
 	}
 
 	return source, nil
@@ -129,7 +135,7 @@ func (r *Redgifs) getNewOrSavedToken() (string, error) {
 
 func (r *Redgifs) fetchMedia(source SourceType, limit int, extensions []string, deep bool) ([]model.Media, error) {
 	media := make([]model.Media, 0)
-	videos := make([]Video, 0)
+	gifs := make([]Gif, 0)
 	amountQueried := 0
 	var err error
 
@@ -140,7 +146,9 @@ func (r *Redgifs) fetchMedia(source SourceType, limit int, extensions []string, 
 
 	switch s := source.(type) {
 	case SourceVideo:
-		videos, err = r.fetchVideo(s, token)
+		gifs, err = r.fetchGif(s, token)
+	case SourceUser:
+		gifs, err = r.fetchUser(s, token, limit)
 	}
 
 	if err != nil {
@@ -148,41 +156,78 @@ func (r *Redgifs) fetchMedia(source SourceType, limit int, extensions []string, 
 	}
 
 	sourceName := strings.TrimPrefix(reflect.TypeOf(source).Name(), "Source")
-	newMedia := videosToMedia(videos, sourceName)
+	newMedia := videosToMedia(gifs, sourceName)
 	media, amountQueried = utils.MergeMedia(media, newMedia)
 
 	if r.Callback != nil {
 		r.Callback(event.OnMediaQueried{Amount: amountQueried})
 	}
-	
+
+	// Limiting the number of results
+	if len(media) > limit {
+		media = media[:limit]
+	}
+
 	return media, nil
 }
 
-func (r *Redgifs) fetchVideo(source SourceVideo, token string) ([]Video, error) {
-	video, err := getVideo(
+func (r *Redgifs) fetchGif(source SourceVideo, token string) ([]Gif, error) {
+	response, err := getGif(
 		fmt.Sprintf("Bearer %s", token),
 		fmt.Sprintf("https://www.redgifs.com/watch/%s", source.Id),
 		source.Id,
 	)
 
 	if err != nil {
-		return make([]Video, 0), err
+		return make([]Gif, 0), err
 	}
 
-	return []Video{*video}, nil
+	return []Gif{response.Gif}, nil
+}
+
+func (r *Redgifs) fetchUser(source SourceUser, token string, limit int) ([]Gif, error) {
+	gifs := make([]Gif, 0)
+
+	bearer := fmt.Sprintf("Bearer %s", token)
+	url := fmt.Sprintf("https://www.redgifs.com/users/%s", source.Name)
+	response, err := getUser(bearer, url, source.Name, 1)
+
+	if err != nil {
+		return gifs, err
+	}
+
+	gifs = append(gifs, response.Gifs...)
+	maxPages := math.Ceil(float64(limit) / 100)
+	numPages := int(math.Min(float64(response.Pages), maxPages))
+
+	for i := 2; i <= numPages; i++ {
+		response, err = getUser(bearer, url, source.Name, i)
+		if err != nil {
+			return gifs, err
+		}
+
+		gifs = append(gifs, response.Gifs...)
+	}
+
+	return gifs, nil
 }
 
 // endregion
 
 // region - Private functions
 
-func videosToMedia(videos []Video, sourceName string) []model.Media {
-	return lo.Map(videos, func(video Video, _ int) model.Media {
-		return model.NewMedia(video.Gif.Url.Hd, model.RedGifs, map[string]interface{}{
-			"name":    video.Gif.Username,
+func videosToMedia(gifs []Gif, sourceName string) []model.Media {
+	return lo.Map(gifs, func(gif Gif, _ int) model.Media {
+		url := gif.Url.Hd
+		if url == "" {
+			url = gif.Url.Sd
+		}
+
+		return model.NewMedia(url, model.RedGifs, map[string]interface{}{
+			"name":    gif.Username,
 			"source":  strings.ToLower(sourceName),
-			"created": video.Gif.Created,
-			"id":      video.Gif.Id,
+			"created": gif.Created,
+			"id":      gif.Id,
 		})
 	})
 }

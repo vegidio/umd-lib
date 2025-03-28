@@ -13,14 +13,14 @@ func main() {
 		TimestampFormat: "2006-01-02 15:04:05.000",
 	})
 
-	u, _ := umd.New("https://fapello.com/caylinlive-33/", nil, func(ev event.Event) {
+	u, _ := umd.New("https://www.redgifs.com/users/atomicbrunette18", nil, func(ev event.Event) {
 		switch e := ev.(type) {
 		case event.OnMediaQueried:
 			log.Info("Found ", e.Amount, " media")
 		}
 	})
 
-	resp, err := u.QueryMedia(10, nil, true)
+	resp, err := u.QueryMedia(99999, nil, true)
 	if err != nil {
 		log.Error(err)
 		return

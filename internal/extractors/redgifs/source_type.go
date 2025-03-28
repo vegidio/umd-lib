@@ -13,3 +13,11 @@ type SourceVideo struct {
 
 // isSourceType implements the SourceType interface for Video.
 func (s SourceVideo) isSourceType() {}
+
+// SourceUser represents a user source type.
+type SourceUser struct {
+	Name string
+}
+
+// isSourceType implements the SourceType interface for User.
+func (s SourceUser) isSourceType() {}

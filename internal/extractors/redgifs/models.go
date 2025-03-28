@@ -25,6 +25,12 @@ type Gif struct {
 	Created  utils.EpochTime `json:"createDate"`
 }
 
-type Video struct {
+type GifResponse struct {
 	Gif Gif `json:"gif"`
+}
+
+type UserResponse struct {
+	Page  int   `json:"page"`
+	Pages int   `json:"pages"`
+	Gifs  []Gif `json:"gifs"`
 }

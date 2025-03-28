@@ -16,7 +16,7 @@ func TestRedGifs_DownloadVideo(t *testing.T) {
 	// Delete any previous file before continuing
 	const FilePath = "video.mp4"
 	_ = os.Remove(FilePath)
-	
+
 	u, _ := umd.New("https://www.redgifs.com/watch/sturdycuddlyicefish", nil, nil)
 	resp, _ := u.QueryMedia(99999, nil, true)
 
@@ -27,6 +27,20 @@ func TestRedGifs_DownloadVideo(t *testing.T) {
 
 	assert.NoError(t, downloadResponse.Err())
 	assert.Equal(t, int64(15_212_770), downloadResponse.Size())
+	assert.Equal(t, "sturdycuddlyicefish", media.Metadata["id"])
+	assert.Equal(t, "sonya_18yo", media.Metadata["name"])
+}
+
+func TestRedGifs_FetchUser(t *testing.T) {
+	u, _ := umd.New("https://www.redgifs.com/users/atomicbrunette18", nil, nil)
+	resp, err := u.QueryMedia(180, nil, true)
+
+	media := resp.Media[0]
+
+	assert.NoError(t, err)
+	assert.Equal(t, 180, len(resp.Media))
+	assert.Equal(t, "user", media.Metadata["source"])
+	assert.Equal(t, "atomicbrunette18", media.Metadata["name"])
 }
 
 func TestRedGifs_ReuseToken(t *testing.T) {
