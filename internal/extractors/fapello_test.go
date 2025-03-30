@@ -7,14 +7,14 @@ import (
 )
 
 func TestFapello_QueryPosts(t *testing.T) {
-	const NumberOfPosts = 49
+	const NumberOfPosts = 91
 
-	u, _ := umd.New("https://fapello.com/caylinlive-33/", nil, nil)
+	u, _ := umd.New("https://fapello.com/darja-sobakinskaja/", nil, nil)
 	resp, err := u.QueryMedia(99999, nil, true)
 	media := resp.Media
 
 	assert.NoError(t, err)
 	assert.Equal(t, NumberOfPosts, len(media))
 	assert.Equal(t, "model", media[0].Metadata["source"])
-	assert.Equal(t, "caylinlive-33", media[0].Metadata["name"])
+	assert.Equal(t, "darja-sobakinskaja", media[0].Metadata["name"])
 }
