@@ -226,7 +226,7 @@ func videosToMedia(gifs []Gif, sourceName string) []model.Media {
 		return model.NewMedia(url, model.RedGifs, map[string]interface{}{
 			"name":    gif.Username,
 			"source":  strings.ToLower(sourceName),
-			"created": gif.Created,
+			"created": gif.Created.Time,
 			"id":      gif.Id,
 		})
 	})
