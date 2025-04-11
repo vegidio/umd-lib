@@ -148,14 +148,14 @@ func (c *Coomer) fetchMedia(source SourceType, limit int, extensions []string, _
 func (c *Coomer) fetchUserMedia(source SourceUser, limit int, extensions []string) ([]model.Media, error) {
 	media := make([]model.Media, 0)
 	amountQueried := 0
+	results := getUser(source.Service, source.User)
 
-	posts, err := getUserPosts(source.Service, source.User)
-	if err != nil {
-		return media, err
-	}
+	for result := range results {
+		if result.Err != nil {
+			return media, result.Err
+		}
 
-	for _, post := range posts {
-		newMedia := c.postToMedia(post)
+		newMedia := c.postToMedia(result.Data)
 
 		media, amountQueried = utils.MergeMedia(media, newMedia)
 		if c.Callback != nil && amountQueried > 0 {
@@ -163,7 +163,7 @@ func (c *Coomer) fetchUserMedia(source SourceUser, limit int, extensions []strin
 		}
 
 		// Limiting the number of results
-		if len(media) > limit {
+		if len(media) >= limit {
 			break
 		}
 	}
@@ -175,12 +175,12 @@ func (c *Coomer) fetchPostMedia(source SourcePost, limit int, extensions []strin
 	media := make([]model.Media, 0)
 	amountQueried := 0
 
-	post, err := getPost(source.Service, source.User, source.Id)
+	response, err := getPost(source.Service, source.User, source.Id)
 	if err != nil {
 		return media, err
 	}
 
-	newMedia := c.postToMedia(*post)
+	newMedia := c.postToMedia(*response)
 
 	media, amountQueried = utils.MergeMedia(media, newMedia)
 	if c.Callback != nil && amountQueried > 0 {
@@ -190,27 +190,29 @@ func (c *Coomer) fetchPostMedia(source SourcePost, limit int, extensions []strin
 	return media, nil
 }
 
-func (c *Coomer) postToMedia(post Post) []model.Media {
+func (c *Coomer) postToMedia(response Response) []model.Media {
 	media := make([]model.Media, 0)
 
-	if post.File.Path != "" {
-		url := c.baseUrl + post.File.Path
-		newMedia := model.NewMedia(url, c.extractor, map[string]interface{}{
-			"source":  post.Service,
-			"name":    post.User,
-			"created": post.Published.Time,
-		})
+	for _, image := range response.Images {
+		if image.Path != "" {
+			url := image.Server + "/data" + image.Path
+			newMedia := model.NewMedia(url, c.extractor, map[string]interface{}{
+				"source":  response.Post.Service,
+				"name":    response.Post.User,
+				"created": response.Post.Published.Time,
+			})
 
-		media = append(media, newMedia)
+			media = append(media, newMedia)
+		}
 	}
 
-	for _, attachment := range post.Attachments {
-		if attachment.Path != "" {
-			url := c.baseUrl + attachment.Path
+	for _, video := range response.Videos {
+		if video.Path != "" {
+			url := video.Server + "/data" + video.Path
 			newMedia := model.NewMedia(url, c.extractor, map[string]interface{}{
-				"source":  post.Service,
-				"name":    post.User,
-				"created": post.Published.Time,
+				"source":  response.Post.Service,
+				"name":    response.Post.User,
+				"created": response.Post.Published.Time,
 			})
 
 			media = append(media, newMedia)

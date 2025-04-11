@@ -7,20 +7,20 @@ import (
 )
 
 func main() {
-	//log.SetLevel(log.DebugLevel)
+	log.SetLevel(log.DebugLevel)
 	log.SetFormatter(&log.TextFormatter{
 		FullTimestamp:   true,
 		TimestampFormat: "2006-01-02 15:04:05.000",
 	})
 
-	u, _ := umd.New("https://www.redgifs.com/users/atomicbrunette18", nil, func(ev event.Event) {
+	u, _ := umd.New("https://coomer.su/onlyfans/user/melindalondon", nil, func(ev event.Event) {
 		switch e := ev.(type) {
 		case event.OnMediaQueried:
 			log.Info("Found ", e.Amount, " media")
 		}
 	})
 
-	resp, err := u.QueryMedia(99999, nil, true)
+	resp, err := u.QueryMedia(100, nil, true)
 	if err != nil {
 		log.Error(err)
 		return

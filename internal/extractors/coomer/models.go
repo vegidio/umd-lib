@@ -4,18 +4,20 @@ import (
 	"github.com/vegidio/umd-lib/internal/utils"
 )
 
-type Post struct {
-	Service     string         `json:"service"`
-	User        string         `json:"user"`
-	Published   utils.NotzTime `json:"published"`
-	File        File           `json:"file"`
-	Attachments []File         `json:"attachments"`
+type Response struct {
+	Post   *Post  `json:"post"`
+	Images []File `json:"previews"`
+	Videos []File `json:"attachments"`
 }
 
-type Response struct {
-	Post *Post `json:"post"`
+type Post struct {
+	Id        string         `json:"id"`
+	Service   string         `json:"service"`
+	User      string         `json:"user"`
+	Published utils.NotzTime `json:"published"`
 }
 
 type File struct {
-	Path string `json:"path"`
+	Server string `json:"server"`
+	Path   string `json:"path"`
 }
