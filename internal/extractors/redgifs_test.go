@@ -17,8 +17,9 @@ func TestRedGifs_DownloadVideo(t *testing.T) {
 	const FilePath = "video.mp4"
 	_ = os.Remove(FilePath)
 
-	u, _ := umd.New("https://www.redgifs.com/watch/sturdycuddlyicefish", nil, nil)
-	resp, _ := u.QueryMedia(99999, nil, true)
+	u := umd.New(nil, nil)
+	extractor, _ := u.FindExtractor("https://www.redgifs.com/watch/sturdycuddlyicefish")
+	resp, _ := extractor.QueryMedia(99999, nil, true)
 
 	media := resp.Media[0]
 	request, _ := grab.NewRequest("video.mp4", media.Url)
@@ -32,8 +33,9 @@ func TestRedGifs_DownloadVideo(t *testing.T) {
 }
 
 func TestRedGifs_FetchUser(t *testing.T) {
-	u, _ := umd.New("https://www.redgifs.com/users/atomicbrunette18", nil, nil)
-	resp, err := u.QueryMedia(180, nil, true)
+	u := umd.New(nil, nil)
+	extractor, _ := u.FindExtractor("https://www.redgifs.com/users/atomicbrunette18")
+	resp, err := extractor.QueryMedia(180, nil, true)
 
 	media := resp.Media[0]
 
@@ -50,12 +52,14 @@ func TestRedGifs_ReuseToken(t *testing.T) {
 	log.SetLevel(log.DebugLevel)
 
 	// First query
-	u, _ := umd.New("https://www.redgifs.com/watch/sturdycuddlyicefish", nil, nil)
-	resp, _ := u.QueryMedia(99999, nil, true)
+	u := umd.New(nil, nil)
+	extractor, _ := u.FindExtractor("https://www.redgifs.com/watch/sturdycuddlyicefish")
+	resp, _ := extractor.QueryMedia(99999, nil, true)
 
 	// Second query
-	u, _ = umd.New("https://www.redgifs.com/watch/ecstaticthickasiansmallclawedotter", resp.Metadata, nil)
-	_, _ = u.QueryMedia(99999, nil, true)
+	u = umd.New(resp.Metadata, nil)
+	extractor, _ = u.FindExtractor("https://www.redgifs.com/watch/ecstaticthickasiansmallclawedotter")
+	_, _ = extractor.QueryMedia(99999, nil, true)
 
 	// Check the log output
 	output := buf.String()

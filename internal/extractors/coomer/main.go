@@ -3,7 +3,6 @@ package coomer
 import (
 	"fmt"
 	"github.com/vegidio/umd-lib/event"
-	"github.com/vegidio/umd-lib/fetch"
 	"github.com/vegidio/umd-lib/internal/model"
 	"github.com/vegidio/umd-lib/internal/utils"
 	"reflect"
@@ -15,50 +14,95 @@ type Coomer struct {
 	Metadata model.Metadata
 	Callback func(event event.Event)
 
-	baseUrl          string
+	url              string
 	extractor        model.ExtractorType
+	source           model.SourceType
 	services         string
 	responseMetadata model.Metadata
 	external         model.External
 }
 
-func New(url string, metadata model.Metadata, callback func(event event.Event)) model.Extractor {
+func New(url string, metadata model.Metadata, callback func(event event.Event), external model.External) model.Extractor {
 	switch {
 	case utils.HasHost(url, "coomer.su") || utils.HasHost(url, "coomer.party"):
+		baseUrl = "https://coomer.su"
+
 		return &Coomer{
-			Metadata:  metadata,
-			Callback:  callback,
-			baseUrl:   "https://coomer.su",
+			Metadata: metadata,
+			Callback: callback,
+
+			url:       url,
 			extractor: model.Coomer,
 			services:  "onlyfans|fansly|candfans",
+			external:  external,
 		}
 	case utils.HasHost(url, "kemono.su") || utils.HasHost(url, "kemono.party"):
+		baseUrl = "https://kemono.su"
+
 		return &Coomer{
-			Metadata:  metadata,
-			Callback:  callback,
-			baseUrl:   "https://kemono.su",
+			Metadata: metadata,
+			Callback: callback,
+
+			url:       url,
 			extractor: model.Kemono,
 			services:  "patreon|fanbox|discord|fantia|afdian|boosty|gumroad|subscribestar|dlsite",
+			external:  external,
 		}
 	}
 
 	return nil
 }
 
-func (c *Coomer) QueryMedia(url string, limit int, extensions []string, deep bool) (*model.Response, error) {
+func (c *Coomer) GetSourceType() (model.SourceType, error) {
+	regexPost := regexp.MustCompile(`(` + c.services + `)/user/([^/]+)/post/([^/\n?]+)`)
+	regexUser := regexp.MustCompile(`(` + c.services + `)/user/([^/\n?]+)`)
+
+	var source model.SourceType
+	var user string
+
+	switch {
+	case regexPost.MatchString(c.url):
+		matches := regexPost.FindStringSubmatch(c.url)
+		service := matches[1]
+		user = matches[2]
+		id := matches[3]
+		source = SourcePost{Service: service, Id: id, name: user}
+
+	case regexUser.MatchString(c.url):
+		matches := regexUser.FindStringSubmatch(c.url)
+		service := matches[1]
+		user = matches[2]
+		source = SourceUser{Service: service, name: user}
+	}
+
+	if source == nil {
+		return nil, fmt.Errorf("source type not found for URL: %s", c.url)
+	}
+
+	if c.Callback != nil {
+		sourceType := strings.TrimPrefix(reflect.TypeOf(source).Name(), "Source")
+		c.Callback(event.OnExtractorTypeFound{Type: sourceType, Name: user})
+	}
+
+	c.source = source
+	return source, nil
+}
+
+func (c *Coomer) QueryMedia(limit int, extensions []string, deep bool) (*model.Response, error) {
 	var err error
-	baseUrl = c.baseUrl
 
 	if c.responseMetadata == nil {
 		c.responseMetadata = make(model.Metadata)
 	}
 
-	source, err := c.getSourceType(url)
-	if err != nil {
-		return nil, err
+	if c.source == nil {
+		c.source, err = c.GetSourceType()
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	media, err := c.fetchMedia(source, limit, extensions, deep)
+	media, err := c.fetchMedia(c.source, limit, extensions, deep)
 	if err != nil {
 		return nil, err
 	}
@@ -68,19 +112,11 @@ func (c *Coomer) QueryMedia(url string, limit int, extensions []string, deep boo
 	}
 
 	return &model.Response{
-		Url:       url,
+		Url:       c.url,
 		Media:     media,
 		Extractor: c.extractor,
 		Metadata:  c.responseMetadata,
 	}, nil
-}
-
-func (c *Coomer) GetFetch() fetch.Fetch {
-	return fetch.New(nil, 10)
-}
-
-func (c *Coomer) SetExternal(external model.External) {
-	c.external = external
 }
 
 // Compile-time assertion to ensure the extractor implements the Extractor interface
@@ -88,41 +124,7 @@ var _ model.Extractor = (*Coomer)(nil)
 
 // region - Private methods
 
-func (c *Coomer) getSourceType(url string) (SourceType, error) {
-	regexPost := regexp.MustCompile(`(` + c.services + `)/user/([^/]+)/post/([^/\n?]+)`)
-	regexUser := regexp.MustCompile(`(` + c.services + `)/user/([^/\n?]+)`)
-
-	var source SourceType
-	var user string
-
-	switch {
-	case regexPost.MatchString(url):
-		matches := regexPost.FindStringSubmatch(url)
-		service := matches[1]
-		user = matches[2]
-		id := matches[3]
-		source = SourcePost{Service: service, User: user, Id: id}
-
-	case regexUser.MatchString(url):
-		matches := regexUser.FindStringSubmatch(url)
-		service := matches[1]
-		user = matches[2]
-		source = SourceUser{Service: service, User: user}
-	}
-
-	if source == nil {
-		return nil, fmt.Errorf("source type not found for URL: %s", url)
-	}
-
-	if c.Callback != nil {
-		sourceType := strings.TrimPrefix(reflect.TypeOf(source).Name(), "Source")
-		c.Callback(event.OnExtractorTypeFound{Type: sourceType, Name: user})
-	}
-
-	return source, nil
-}
-
-func (c *Coomer) fetchMedia(source SourceType, limit int, extensions []string, _ bool) ([]model.Media, error) {
+func (c *Coomer) fetchMedia(source model.SourceType, limit int, extensions []string, _ bool) ([]model.Media, error) {
 	media := make([]model.Media, 0)
 	var err error
 
@@ -148,7 +150,7 @@ func (c *Coomer) fetchMedia(source SourceType, limit int, extensions []string, _
 func (c *Coomer) fetchUserMedia(source SourceUser, limit int, extensions []string) ([]model.Media, error) {
 	media := make([]model.Media, 0)
 	amountQueried := 0
-	results := getUser(source.Service, source.User)
+	results := getUser(source.Service, source.name)
 
 	for result := range results {
 		if result.Err != nil {
@@ -175,7 +177,7 @@ func (c *Coomer) fetchPostMedia(source SourcePost, limit int, extensions []strin
 	media := make([]model.Media, 0)
 	amountQueried := 0
 
-	response, err := getPost(source.Service, source.User, source.Id)
+	response, err := getPost(source.Service, source.name, source.Id)
 	if err != nil {
 		return media, err
 	}

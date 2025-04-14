@@ -13,14 +13,20 @@ func main() {
 		TimestampFormat: "2006-01-02 15:04:05.000",
 	})
 
-	u, _ := umd.New("https://coomer.su/onlyfans/user/melindalondon", nil, func(ev event.Event) {
+	umdObj := umd.New(nil, func(ev event.Event) {
 		switch e := ev.(type) {
 		case event.OnMediaQueried:
 			log.Info("Found ", e.Amount, " media")
 		}
 	})
 
-	resp, err := u.QueryMedia(100, nil, true)
+	extractor, err := umdObj.FindExtractor("https://coomer.su/onlyfans/user/melindalondon")
+	if err != nil {
+		log.Error(err)
+		return
+	}
+
+	resp, err := extractor.QueryMedia(100, nil, true)
 	if err != nil {
 		log.Error(err)
 		return

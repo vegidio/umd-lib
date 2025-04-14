@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/vegidio/umd-lib/event"
-	"github.com/vegidio/umd-lib/fetch"
 	"github.com/vegidio/umd-lib/internal/model"
 	"github.com/vegidio/umd-lib/internal/utils"
 	"reflect"
@@ -18,30 +17,75 @@ type Reddit struct {
 	Metadata model.Metadata
 	Callback func(event event.Event)
 
+	url              string
+	source           model.SourceType
 	responseMetadata model.Metadata
 	external         model.External
 }
 
-func New(url string, metadata model.Metadata, callback func(event event.Event)) model.Extractor {
+func New(url string, metadata model.Metadata, callback func(event event.Event), external model.External) model.Extractor {
 	switch {
 	case utils.HasHost(url, Host):
-		return &Reddit{Metadata: metadata, Callback: callback}
+		return &Reddit{Metadata: metadata, Callback: callback, url: url, external: external}
 	}
 
 	return nil
 }
 
-func (r *Reddit) QueryMedia(url string, limit int, extensions []string, deep bool) (*model.Response, error) {
+func (r *Reddit) GetSourceType() (model.SourceType, error) {
+	regexSubmission := regexp.MustCompile(`/(?:r|u|user)/([^/?]+)/comments/([^/\n?]+)`)
+	regexUser := regexp.MustCompile(`/(?:u|user)/([^/\n?]+)`)
+	regexSubreddit := regexp.MustCompile(`/r/([^/\n]+)`)
+
+	var source model.SourceType
+	var name string
+
+	switch {
+	case regexSubmission.MatchString(r.url):
+		matches := regexSubmission.FindStringSubmatch(r.url)
+		name = matches[1]
+		id := matches[2]
+		source = SourceSubmission{Id: id, name: name}
+
+	case regexUser.MatchString(r.url):
+		matches := regexUser.FindStringSubmatch(r.url)
+		name = matches[1]
+		source = SourceUser{name: name}
+
+	case regexSubreddit.MatchString(r.url):
+		matches := regexSubreddit.FindStringSubmatch(r.url)
+		name = matches[1]
+		source = SourceSubreddit{name: name}
+	}
+
+	if source == nil {
+		return nil, fmt.Errorf("source type not found for URL: %s", r.url)
+	}
+
+	if r.Callback != nil {
+		sourceType := strings.TrimPrefix(reflect.TypeOf(source).Name(), "Source")
+		r.Callback(event.OnExtractorTypeFound{Type: sourceType, Name: name})
+	}
+
+	r.source = source
+	return source, nil
+}
+
+func (r *Reddit) QueryMedia(limit int, extensions []string, deep bool) (*model.Response, error) {
+	var err error
+
 	if r.responseMetadata == nil {
 		r.responseMetadata = make(model.Metadata)
 	}
 
-	source, err := r.getSourceType(url)
-	if err != nil {
-		return nil, err
+	if r.source == nil {
+		r.source, err = r.GetSourceType()
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	media, err := r.fetchMedia(source, limit, extensions, deep)
+	media, err := r.fetchMedia(r.source, limit, extensions, deep)
 	if err != nil {
 		return nil, err
 	}
@@ -51,19 +95,11 @@ func (r *Reddit) QueryMedia(url string, limit int, extensions []string, deep boo
 	}
 
 	return &model.Response{
-		Url:       url,
+		Url:       r.url,
 		Media:     media,
 		Extractor: model.Reddit,
 		Metadata:  r.responseMetadata,
 	}, nil
-}
-
-func (r *Reddit) GetFetch() fetch.Fetch {
-	return fetch.New(nil, 0)
-}
-
-func (r *Reddit) SetExternal(external model.External) {
-	r.external = external
 }
 
 // Compile-time assertion to ensure the extractor implements the Extractor interface
@@ -71,51 +107,13 @@ var _ model.Extractor = (*Reddit)(nil)
 
 // region - Private methods
 
-func (r *Reddit) getSourceType(url string) (SourceType, error) {
-	regexSubmission := regexp.MustCompile(`/(?:r|u|user)/([^/?]+)/comments/([^/\n?]+)`)
-	regexUser := regexp.MustCompile(`/(?:u|user)/([^/\n?]+)`)
-	regexSubreddit := regexp.MustCompile(`/r/([^/\n]+)`)
-
-	var source SourceType
-	var name string
-
-	switch {
-	case regexSubmission.MatchString(url):
-		matches := regexSubmission.FindStringSubmatch(url)
-		name = matches[1]
-		id := matches[2]
-		source = SourceSubmission{Name: name, Id: id}
-
-	case regexUser.MatchString(url):
-		matches := regexUser.FindStringSubmatch(url)
-		name = matches[1]
-		source = SourceUser{Name: name}
-
-	case regexSubreddit.MatchString(url):
-		matches := regexSubreddit.FindStringSubmatch(url)
-		name = matches[1]
-		source = SourceSubreddit{Name: name}
-	}
-
-	if source == nil {
-		return nil, fmt.Errorf("source type not found for URL: %s", url)
-	}
-
-	if r.Callback != nil {
-		sourceType := strings.TrimPrefix(reflect.TypeOf(source).Name(), "Source")
-		r.Callback(event.OnExtractorTypeFound{Type: sourceType, Name: name})
-	}
-
-	return source, nil
-}
-
-func (r *Reddit) fetchMedia(source SourceType, limit int, extensions []string, deep bool) ([]model.Media, error) {
+func (r *Reddit) fetchMedia(source model.SourceType, limit int, extensions []string, deep bool) ([]model.Media, error) {
 	media := make([]model.Media, 0)
 	amountQueried := 0
 	after := ""
 
 	sourceName := strings.TrimPrefix(reflect.TypeOf(source).Name(), "Source")
-	name := reflect.ValueOf(source).FieldByName("Name").String()
+	name := source.GetName()
 
 	for {
 		var submission *Submission
@@ -125,9 +123,9 @@ func (r *Reddit) fetchMedia(source SourceType, limit int, extensions []string, d
 		case SourceSubmission:
 			submission, err = getSubmission(s.Id)
 		case SourceUser:
-			submission, err = getUserSubmissions(s.Name, after, limit)
+			submission, err = getUserSubmissions(s.name, after, limit)
 		case SourceSubreddit:
-			submission, err = getSubredditSubmissions(s.Name, after, limit)
+			submission, err = getSubredditSubmissions(s.name, after, limit)
 		}
 
 		if err != nil {

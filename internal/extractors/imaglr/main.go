@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"github.com/samber/lo"
 	"github.com/vegidio/umd-lib/event"
-	"github.com/vegidio/umd-lib/fetch"
 	"github.com/vegidio/umd-lib/internal/model"
 	"github.com/vegidio/umd-lib/internal/utils"
 	"reflect"
@@ -16,52 +15,76 @@ type Imaglr struct {
 	Metadata model.Metadata
 	Callback func(event event.Event)
 
+	url              string
+	source           model.SourceType
 	responseMetadata model.Metadata
 	external         model.External
 }
 
-func New(url string, metadata model.Metadata, callback func(event event.Event)) model.Extractor {
+func New(url string, metadata model.Metadata, callback func(event event.Event), external model.External) model.Extractor {
 	switch {
 	case utils.HasHost(url, "imaglr.com"):
-		return &Imaglr{Metadata: metadata, Callback: callback}
+		return &Imaglr{Metadata: metadata, Callback: callback, url: url, external: external}
 	}
 
 	return nil
 }
 
-func (r *Imaglr) QueryMedia(url string, limit int, extensions []string, deep bool) (*model.Response, error) {
-	if r.responseMetadata == nil {
-		r.responseMetadata = make(model.Metadata)
+func (i *Imaglr) GetSourceType() (model.SourceType, error) {
+	regexPost := regexp.MustCompile(`/post/([^/\n?]+)`)
+
+	var source model.SourceType
+	var id string
+
+	switch {
+	case regexPost.MatchString(i.url):
+		matches := regexPost.FindStringSubmatch(i.url)
+		id = matches[1]
+		source = SourcePost{name: id}
 	}
 
-	source, err := r.getSourceType(url)
+	if source == nil {
+		return nil, fmt.Errorf("source type not found for URL: %s", i.url)
+	}
+
+	if i.Callback != nil {
+		sourceType := strings.TrimPrefix(reflect.TypeOf(source).Name(), "Source")
+		i.Callback(event.OnExtractorTypeFound{Type: sourceType, Name: id})
+	}
+
+	i.source = source
+	return source, nil
+}
+
+func (i *Imaglr) QueryMedia(limit int, extensions []string, deep bool) (*model.Response, error) {
+	var err error
+
+	if i.responseMetadata == nil {
+		i.responseMetadata = make(model.Metadata)
+	}
+
+	if i.source == nil {
+		i.source, err = i.GetSourceType()
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	media, err := i.fetchMedia(i.source, limit, extensions, deep)
 	if err != nil {
 		return nil, err
 	}
 
-	media, err := r.fetchMedia(source, limit, extensions, deep)
-	if err != nil {
-		return nil, err
-	}
-
-	if r.Callback != nil {
-		r.Callback(event.OnQueryCompleted{Total: len(media)})
+	if i.Callback != nil {
+		i.Callback(event.OnQueryCompleted{Total: len(media)})
 	}
 
 	return &model.Response{
-		Url:       url,
+		Url:       i.url,
 		Media:     media,
 		Extractor: model.Imaglr,
-		Metadata:  r.responseMetadata,
+		Metadata:  i.responseMetadata,
 	}, nil
-}
-
-func (r *Imaglr) GetFetch() fetch.Fetch {
-	return fetch.New(nil, 0)
-}
-
-func (r *Imaglr) SetExternal(external model.External) {
-	r.external = external
 }
 
 // Compile-time assertion to ensure the extractor implements the Extractor interface
@@ -69,32 +92,7 @@ var _ model.Extractor = (*Imaglr)(nil)
 
 // region - Private methods
 
-func (r *Imaglr) getSourceType(url string) (SourceType, error) {
-	regexPost := regexp.MustCompile(`/post/([^/\n?]+)`)
-
-	var source SourceType
-	var id string
-
-	switch {
-	case regexPost.MatchString(url):
-		matches := regexPost.FindStringSubmatch(url)
-		id = matches[1]
-		source = SourcePost{Id: id}
-	}
-
-	if source == nil {
-		return nil, fmt.Errorf("source type not found for URL: %s", url)
-	}
-
-	if r.Callback != nil {
-		sourceType := strings.TrimPrefix(reflect.TypeOf(source).Name(), "Source")
-		r.Callback(event.OnExtractorTypeFound{Type: sourceType, Name: id})
-	}
-
-	return source, nil
-}
-
-func (r *Imaglr) fetchMedia(source SourceType, limit int, extensions []string, deep bool) ([]model.Media, error) {
+func (i *Imaglr) fetchMedia(source model.SourceType, limit int, extensions []string, deep bool) ([]model.Media, error) {
 	media := make([]model.Media, 0)
 	posts := make([]Post, 0)
 	amountQueried := 0
@@ -102,7 +100,7 @@ func (r *Imaglr) fetchMedia(source SourceType, limit int, extensions []string, d
 
 	switch s := source.(type) {
 	case SourcePost:
-		posts, err = r.fetchPost(s)
+		posts, err = i.fetchPost(s)
 	}
 
 	if err != nil {
@@ -113,15 +111,15 @@ func (r *Imaglr) fetchMedia(source SourceType, limit int, extensions []string, d
 	newMedia := postsToMedia(posts, sourceName)
 	media, amountQueried = utils.MergeMedia(media, newMedia)
 
-	if r.Callback != nil {
-		r.Callback(event.OnMediaQueried{Amount: amountQueried})
+	if i.Callback != nil {
+		i.Callback(event.OnMediaQueried{Amount: amountQueried})
 	}
 
 	return media, nil
 }
 
-func (r *Imaglr) fetchPost(source SourcePost) ([]Post, error) {
-	post, err := getPost(source.Id)
+func (i *Imaglr) fetchPost(source SourcePost) ([]Post, error) {
+	post, err := getPost(source.name)
 
 	if err != nil {
 		return make([]Post, 0), err

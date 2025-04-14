@@ -1,32 +1,30 @@
 package reddit
 
-// SourceType is the interface that all source types implement.
-// The isSourceType method is unexported to restrict implementation to the same package.
-type SourceType interface {
-	isSourceType()
-}
-
 // SourceSubmission represents a submission source type.
 type SourceSubmission struct {
-	Name string
-	Id   string
+	Id string
+
+	name string
 }
 
-// isSourceType implements the SourceType interface for Submission.
-func (SourceSubmission) isSourceType() {}
+func (s SourceSubmission) GetName() string {
+	return s.name
+}
 
 // SourceUser represents a user source type.
 type SourceUser struct {
-	Name string
+	name string
 }
 
-// isSourceType implements the SourceType interface for User.
-func (SourceUser) isSourceType() {}
+func (s SourceUser) GetName() string {
+	return s.name
+}
 
 // SourceSubreddit represents a subreddit source type.
 type SourceSubreddit struct {
-	Name string
+	name string
 }
 
-// isSourceType implements the SourceType interface for Subreddit.
-func (SourceSubreddit) isSourceType() {}
+func (s SourceSubreddit) GetName() string {
+	return s.name
+}

@@ -15,8 +15,9 @@ func TestReddit_QuerySubreddit(t *testing.T) {
 
 	const NumberOfPosts = 50
 
-	u, _ := umd.New("https://www.reddit.com/r/PristineGirls/", nil, nil)
-	resp, err := u.QueryMedia(NumberOfPosts, nil, true)
+	u := umd.New(nil, nil)
+	extractor, _ := u.FindExtractor("https://www.reddit.com/r/PristineGirls/")
+	resp, err := extractor.QueryMedia(NumberOfPosts, nil, true)
 	media := resp.Media
 
 	assert.NoError(t, err)
@@ -32,8 +33,9 @@ func TestReddit_QuerySubmissions(t *testing.T) {
 
 	const NumberOfPosts = 50
 
-	u, _ := umd.New("https://www.reddit.com/user/atomicbrunette18/", nil, nil)
-	resp, err := u.QueryMedia(NumberOfPosts, nil, true)
+	u := umd.New(nil, nil)
+	extractor, _ := u.FindExtractor("https://www.reddit.com/user/atomicbrunette18/")
+	resp, err := extractor.QueryMedia(NumberOfPosts, nil, true)
 	media := resp.Media
 
 	assert.NoError(t, err)
@@ -47,8 +49,9 @@ func TestReddit_QuerySingleSubmission(t *testing.T) {
 		t.Skip("This test doesn't work when executed from GitHub Actions")
 	}
 
-	u, _ := umd.New("https://www.reddit.com/r/needysluts/comments/1aenk3e/if_im_wearing_this_for_our_date_you_have_bo/", nil, nil)
-	resp, err := u.QueryMedia(99999, nil, true)
+	u := umd.New(nil, nil)
+	extractor, _ := u.FindExtractor("https://www.reddit.com/r/needysluts/comments/1aenk3e/if_im_wearing_this_for_our_date_you_have_bo/")
+	resp, err := extractor.QueryMedia(99999, nil, true)
 	media := resp.Media
 
 	assert.NoError(t, err)

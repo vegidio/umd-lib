@@ -1,23 +1,19 @@
 package redgifs
 
-// SourceType is the interface that all source types implement.
-// The isSourceType method is unexported to restrict implementation to the same package.
-type SourceType interface {
-	isSourceType()
-}
-
 // SourceVideo represents a video source type.
 type SourceVideo struct {
-	Id string
+	name string
 }
 
-// isSourceType implements the SourceType interface for Video.
-func (s SourceVideo) isSourceType() {}
+func (s SourceVideo) GetName() string {
+	return s.name
+}
 
 // SourceUser represents a user source type.
 type SourceUser struct {
-	Name string
+	name string
 }
 
-// isSourceType implements the SourceType interface for User.
-func (s SourceUser) isSourceType() {}
+func (s SourceUser) GetName() string {
+	return s.name
+}

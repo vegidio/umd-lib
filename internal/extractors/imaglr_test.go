@@ -14,8 +14,9 @@ func TestImaglr_DownloadVideo(t *testing.T) {
 	const FilePath = "video.mp4"
 	_ = os.Remove(FilePath)
 
-	u, _ := umd.New("https://imaglr.com/post/5778297", nil, nil)
-	resp, _ := u.QueryMedia(99999, nil, true)
+	u := umd.New(nil, nil)
+	extractor, _ := u.FindExtractor("https://imaglr.com/post/5778297")
+	resp, _ := extractor.QueryMedia(99999, nil, true)
 
 	media := resp.Media[0]
 	request, _ := grab.NewRequest("video.mp4", media.Url)

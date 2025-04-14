@@ -9,8 +9,9 @@ import (
 func TestFapello_QueryPosts(t *testing.T) {
 	const NumberOfPosts = 91
 
-	u, _ := umd.New("https://fapello.com/darja-sobakinskaja/", nil, nil)
-	resp, err := u.QueryMedia(99999, nil, true)
+	u := umd.New(nil, nil)
+	extractor, _ := u.FindExtractor("https://fapello.com/darja-sobakinskaja/")
+	resp, err := extractor.QueryMedia(99999, nil, true)
 	media := resp.Media
 
 	assert.NoError(t, err)

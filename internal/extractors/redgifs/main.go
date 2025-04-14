@@ -18,30 +18,67 @@ type Redgifs struct {
 	Metadata model.Metadata
 	Callback func(event event.Event)
 
+	url              string
+	source           model.SourceType
 	responseMetadata model.Metadata
 	external         model.External
 }
 
-func New(url string, metadata model.Metadata, callback func(event event.Event)) model.Extractor {
+func New(url string, metadata model.Metadata, callback func(event event.Event), external model.External) model.Extractor {
 	switch {
 	case utils.HasHost(url, "redgifs.com"):
-		return &Redgifs{Metadata: metadata, Callback: callback}
+		return &Redgifs{Metadata: metadata, Callback: callback, url: url, external: external}
 	}
 
 	return nil
 }
 
-func (r *Redgifs) QueryMedia(url string, limit int, extensions []string, deep bool) (*model.Response, error) {
+func (r *Redgifs) GetSourceType() (model.SourceType, error) {
+	regexVideo := regexp.MustCompile(`/(ifr|watch)/([^/\n?]+)`)
+	regexUser := regexp.MustCompile(`/users/([^/\n?]+)`)
+
+	var source model.SourceType
+	var name string
+
+	switch {
+	case regexVideo.MatchString(r.url):
+		matches := regexVideo.FindStringSubmatch(r.url)
+		name = matches[2]
+		source = SourceVideo{name: name}
+	case regexUser.MatchString(r.url):
+		matches := regexUser.FindStringSubmatch(r.url)
+		name = matches[1]
+		source = SourceUser{name: name}
+	}
+
+	if source == nil {
+		return nil, fmt.Errorf("source type not found for URL: %s", r.url)
+	}
+
+	if r.Callback != nil {
+		sourceType := strings.TrimPrefix(reflect.TypeOf(source).Name(), "Source")
+		r.Callback(event.OnExtractorTypeFound{Type: sourceType, Name: name})
+	}
+
+	r.source = source
+	return source, nil
+}
+
+func (r *Redgifs) QueryMedia(limit int, extensions []string, deep bool) (*model.Response, error) {
+	var err error
+
 	if r.responseMetadata == nil {
 		r.responseMetadata = make(model.Metadata)
 	}
 
-	source, err := r.getSourceType(url)
-	if err != nil {
-		return nil, err
+	if r.source == nil {
+		r.source, err = r.GetSourceType()
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	media, err := r.fetchMedia(source, limit, extensions, deep)
+	media, err := r.fetchMedia(r.source, limit, extensions, deep)
 	if err != nil {
 		return nil, err
 	}
@@ -51,7 +88,7 @@ func (r *Redgifs) QueryMedia(url string, limit int, extensions []string, deep bo
 	}
 
 	return &model.Response{
-		Url:       url,
+		Url:       r.url,
 		Media:     media,
 		Extractor: model.RedGifs,
 		Metadata:  r.responseMetadata,
@@ -62,44 +99,10 @@ func (r *Redgifs) GetFetch() fetch.Fetch {
 	return fetch.New(nil, 0)
 }
 
-func (r *Redgifs) SetExternal(external model.External) {
-	r.external = external
-}
-
 // Compile-time assertion to ensure the extractor implements the Extractor interface
 var _ model.Extractor = (*Redgifs)(nil)
 
 // region - Private methods
-
-func (r *Redgifs) getSourceType(url string) (SourceType, error) {
-	regexVideo := regexp.MustCompile(`/(ifr|watch)/([^/\n?]+)`)
-	regexUser := regexp.MustCompile(`/users/([^/\n?]+)`)
-
-	var source SourceType
-	var name string
-
-	switch {
-	case regexVideo.MatchString(url):
-		matches := regexVideo.FindStringSubmatch(url)
-		name = matches[2]
-		source = SourceVideo{Id: name}
-	case regexUser.MatchString(url):
-		matches := regexUser.FindStringSubmatch(url)
-		name = matches[1]
-		source = SourceUser{Name: name}
-	}
-
-	if source == nil {
-		return nil, fmt.Errorf("source type not found for URL: %s", url)
-	}
-
-	if r.Callback != nil {
-		sourceType := strings.TrimPrefix(reflect.TypeOf(source).Name(), "Source")
-		r.Callback(event.OnExtractorTypeFound{Type: sourceType, Name: name})
-	}
-
-	return source, nil
-}
 
 func (r *Redgifs) getNewOrSavedToken() (string, error) {
 	token, exists := r.Metadata[model.RedGifs]["token"].(string)
@@ -133,7 +136,7 @@ func (r *Redgifs) getNewOrSavedToken() (string, error) {
 	return token, nil
 }
 
-func (r *Redgifs) fetchMedia(source SourceType, limit int, extensions []string, deep bool) ([]model.Media, error) {
+func (r *Redgifs) fetchMedia(source model.SourceType, limit int, extensions []string, deep bool) ([]model.Media, error) {
 	media := make([]model.Media, 0)
 	gifs := make([]Gif, 0)
 	amountQueried := 0
@@ -174,8 +177,8 @@ func (r *Redgifs) fetchMedia(source SourceType, limit int, extensions []string, 
 func (r *Redgifs) fetchGif(source SourceVideo, token string) ([]Gif, error) {
 	response, err := getGif(
 		fmt.Sprintf("Bearer %s", token),
-		fmt.Sprintf("https://www.redgifs.com/watch/%s", source.Id),
-		source.Id,
+		fmt.Sprintf("https://www.redgifs.com/watch/%s", source.name),
+		source.name,
 	)
 
 	if err != nil {
@@ -189,8 +192,8 @@ func (r *Redgifs) fetchUser(source SourceUser, token string, limit int) ([]Gif, 
 	gifs := make([]Gif, 0)
 
 	bearer := fmt.Sprintf("Bearer %s", token)
-	url := fmt.Sprintf("https://www.redgifs.com/users/%s", source.Name)
-	response, err := getUser(bearer, url, source.Name, 1)
+	url := fmt.Sprintf("https://www.redgifs.com/users/%s", source.name)
+	response, err := getUser(bearer, url, source.name, 1)
 
 	if err != nil {
 		return gifs, err
@@ -201,7 +204,7 @@ func (r *Redgifs) fetchUser(source SourceUser, token string, limit int) ([]Gif, 
 	numPages := int(math.Min(float64(response.Pages), maxPages))
 
 	for i := 2; i <= numPages; i++ {
-		response, err = getUser(bearer, url, source.Name, i)
+		response, err = getUser(bearer, url, source.name, i)
 		if err != nil {
 			return gifs, err
 		}

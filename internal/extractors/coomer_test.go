@@ -10,8 +10,9 @@ import (
 func TestCoomer_QueryUser(t *testing.T) {
 	const NumberOfPosts = 50
 
-	u, _ := umd.New("https://coomer.su/onlyfans/user/melindalondon", nil, nil)
-	resp, err := u.QueryMedia(NumberOfPosts, nil, true)
+	u := umd.New(nil, nil)
+	extractor, _ := u.FindExtractor("https://coomer.su/onlyfans/user/melindalondon")
+	resp, err := extractor.QueryMedia(NumberOfPosts, nil, true)
 	media := resp.Media
 
 	assert.NoError(t, err)
@@ -21,8 +22,9 @@ func TestCoomer_QueryUser(t *testing.T) {
 }
 
 func TestCoomer_QueryPost(t *testing.T) {
-	u, _ := umd.New("https://coomer.su/onlyfans/user/melindalondon/post/357160243", nil, nil)
-	resp, err := u.QueryMedia(99999, nil, true)
+	u := umd.New(nil, nil)
+	extractor, _ := u.FindExtractor("https://coomer.su/onlyfans/user/melindalondon/post/357160243")
+	resp, err := extractor.QueryMedia(99999, nil, true)
 	media := resp.Media
 
 	assert.NoError(t, err)
