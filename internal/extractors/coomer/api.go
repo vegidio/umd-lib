@@ -36,7 +36,7 @@ func getUser(service string, user string) <-chan model.Result[Response] {
 				response, postErr := getPost(post.Service, post.User, post.Id)
 				if postErr != nil {
 					result <- model.Result[Response]{Err: postErr}
-					return
+					continue
 				}
 
 				result <- model.Result[Response]{Data: *response}

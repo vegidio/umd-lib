@@ -6,8 +6,6 @@ import (
 	"github.com/go-resty/resty/v2"
 	"github.com/go-rod/rod"
 	log "github.com/sirupsen/logrus"
-	"io"
-	"net/http"
 	"sync"
 	"time"
 )
@@ -28,7 +26,6 @@ var userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (K
 //   - retries: the number of retry attempts for failed requests.
 func New(headers map[string]string, retries int) Fetch {
 	logger := log.New()
-	logger.SetOutput(io.Discard)
 
 	f := resty.New()
 	f.SetHeader("User-Agent", userAgent)
@@ -43,12 +40,13 @@ func New(headers map[string]string, retries int) Fetch {
 			SetRetryWaitTime(0).
 			AddRetryCondition(
 				func(r *resty.Response, err error) bool {
-					if r.StatusCode() == http.StatusTooManyRequests && r.Request.Attempt <= retries {
+					if (err != nil || r.IsError()) && r.Request.Attempt <= retries {
 						sleep := time.Duration(fibonacci(r.Request.Attempt+1)) * time.Second
 
 						log.WithFields(log.Fields{
 							"attempt": r.Request.Attempt,
-							"error":   err,
+							"error":   r.Error(),
+							"status":  r.StatusCode(),
 							"url":     r.Request.URL,
 						}).Warn("failed to get data; retrying in ", sleep)
 
@@ -77,17 +75,20 @@ func (f Fetch) GetText(url string) (string, error) {
 
 	if err != nil {
 		log.WithFields(log.Fields{
-			"url": url,
-		}).Error("Error getting text: ", err)
+			"error":  err,
+			"status": resp.StatusCode(),
+			"url":    url,
+		}).Error("Error getting text")
 
 		return "", err
 	}
 
 	if resp.IsError() {
 		log.WithFields(log.Fields{
+			"error":  err,
 			"status": resp.StatusCode(),
 			"url":    url,
-		}).Error("Error getting text: ", resp.Status())
+		}).Error("Error getting text")
 
 		return "", fmt.Errorf(resp.Status())
 	}
@@ -113,17 +114,20 @@ func (f Fetch) GetResult(url string, headers map[string]string, result interface
 
 	if err != nil {
 		log.WithFields(log.Fields{
-			"url": url,
-		}).Error("error getting result: ", err)
+			"error":  resp.Error(),
+			"status": resp.StatusCode(),
+			"url":    url,
+		}).Error("error getting result")
 
 		return resp, err
 	}
 
 	if resp.IsError() {
 		log.WithFields(log.Fields{
+			"error":  err,
 			"status": resp.StatusCode(),
 			"url":    url,
-		}).Error("error getting result: ", resp.Status())
+		}).Error("Error getting result")
 
 		return resp, fmt.Errorf(resp.Status())
 	}
@@ -202,6 +206,7 @@ func (f Fetch) DownloadFile(request *grab.Request) *grab.Response {
 			log.WithFields(log.Fields{
 				"attempt": attempt,
 				"error":   err,
+				"status":  resp.HTTPResponse.Status,
 				"url":     resp.Request.URL(),
 			}).Warn("failed to download file; retrying in ", sleep)
 
