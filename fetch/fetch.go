@@ -5,6 +5,7 @@ import (
 	"github.com/cavaliergopher/grab/v3"
 	"github.com/go-resty/resty/v2"
 	"github.com/go-rod/rod"
+	"github.com/panjf2000/ants/v2"
 	log "github.com/sirupsen/logrus"
 	"sync"
 	"time"
@@ -196,73 +197,40 @@ func (f Fetch) GetHtml(page *rod.Page, url string, element string) (string, erro
 // Returns:
 //   - *grab.Response: the response from the download.
 func (f Fetch) DownloadFile(request *grab.Request) *grab.Response {
-	resp := f.grabClient.Do(request)
-	err := resp.Err()
-
-	if err != nil && f.retries > 0 {
-		for attempt := 1; attempt <= f.retries; attempt++ {
-			sleep := time.Duration(fibonacci(attempt+1)) * time.Second
-
-			log.WithFields(log.Fields{
-				"attempt": attempt,
-				"error":   err,
-				"status":  resp.HTTPResponse.Status,
-				"url":     resp.Request.URL(),
-			}).Warn("failed to download file; retrying in ", sleep)
-
-			time.Sleep(sleep)
-
-			resp = f.grabClient.Do(request)
-			if err = resp.Err(); err == nil {
-				break
-			}
-		}
-	}
-
-	return resp
+	return f.grabClient.Do(request)
 }
 
-// DownloadFiles attempts to download multiple files in parallel.
+// DownloadFiles downloads multiple files concurrently using a worker pool.
 //
 // Parameters:
-//   - requests: a slice of *grab.Request containing the file URLs and other settings.
-//   - parallel: the number of parallel downloads to perform.
-//   - onDownloadComplete: a callback function to be called when a download completes.
+//   - requests: a slice of *grab.Request objects representing the files to be downloaded.
+//   - parallel: the number of concurrent workers to use for downloading.
 //
-// Returns the total size of all successfully downloaded files.
-func (f Fetch) DownloadFiles(
-	requests []*grab.Request,
-	parallel int,
-	onDownloadComplete func(response *grab.Response),
-) int64 {
+// Returns:
+//   - <-chan *grab.Response: a channel through which the download responses are sent.
+func (f Fetch) DownloadFiles(requests []*grab.Request, parallel int) <-chan *grab.Response {
 	var wg sync.WaitGroup
-	sem := make(chan struct{}, parallel)
-	totalDownloaded := int64(0)
+	result := make(chan *grab.Response)
+	pool, _ := ants.NewPool(parallel)
 
-	for _, request := range requests {
-		wg.Add(1)
+	go func() {
+		defer pool.Release()
+		defer close(result)
 
-		go func(r *grab.Request) {
-			defer func() {
-				<-sem
-				wg.Done()
-			}()
+		for _, request := range requests {
+			wg.Add(1)
 
-			sem <- struct{}{} // acquire a semaphore token
-			resp := f.DownloadFile(r)
-			totalDownloaded += resp.Size()
+			_ = pool.Submit(func() {
+				defer wg.Done()
+				resp := f.DownloadFile(request)
+				result <- resp
+			})
+		}
 
-			// Send status update to the UI
-			if onDownloadComplete != nil {
-				onDownloadComplete(resp)
-			}
-		}(request)
-	}
+		wg.Wait()
+	}()
 
-	wg.Wait()
-	close(sem)
-
-	return totalDownloaded
+	return result
 }
 
 // region - Private functions

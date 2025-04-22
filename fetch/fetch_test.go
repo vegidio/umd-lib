@@ -155,35 +155,6 @@ func TestFetch_DownloadFile_UserAgent(t *testing.T) {
 	assert.Contains(t, string(byteArray), "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko)")
 }
 
-func TestFetch_DownloadFile_TooManyRequests(t *testing.T) {
-	// Create a buffer and redirect global log output to it
-	var buf bytes.Buffer
-	log.SetOutput(&buf)
-
-	// Delete any previous file before continuing
-	const FilePath = "testfile.txt"
-	_ = os.Remove(FilePath)
-
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusTooManyRequests)
-		w.Write([]byte("file content"))
-	}))
-
-	defer server.Close()
-
-	const RetryCount = 3
-	fetch := New(nil, RetryCount)
-	request, _ := grab.NewRequest(FilePath, server.URL)
-	resp := fetch.DownloadFile(request)
-
-	// Check the log output
-	output := buf.String()
-	assert.Equal(t, strings.Count(output, "failed to download file; retrying in"), RetryCount)
-
-	assert.Errorf(t, resp.Err(), "429 Too Many Requests")
-	assert.Equal(t, int64(0), resp.Size())
-}
-
 func TestFetch_DownloadFile_Error(t *testing.T) {
 	// Delete any previous file before continuing
 	const FilePath = "testfile.txt"
