@@ -53,7 +53,11 @@ func New(url string, metadata model.Metadata, callback func(event event.Event), 
 	return nil
 }
 
-func (c *Coomer) GetSourceType() (model.SourceType, error) {
+func (c *Coomer) Type() model.ExtractorType {
+	return c.extractor
+}
+
+func (c *Coomer) SourceType() (model.SourceType, error) {
 	regexPost := regexp.MustCompile(`(` + c.services + `)/user/([^/]+)/post/([^/\n?]+)`)
 	regexUser := regexp.MustCompile(`(` + c.services + `)/user/([^/\n?]+)`)
 
@@ -96,7 +100,7 @@ func (c *Coomer) QueryMedia(limit int, extensions []string, deep bool) (*model.R
 	}
 
 	if c.source == nil {
-		c.source, err = c.GetSourceType()
+		c.source, err = c.SourceType()
 		if err != nil {
 			return nil, err
 		}

@@ -7,7 +7,11 @@ type SourceUser struct {
 	name string
 }
 
-func (s SourceUser) GetName() string {
+func (s SourceUser) Type() string {
+	return "User"
+}
+
+func (s SourceUser) Name() string {
 	return s.name
 }
 
@@ -19,6 +23,10 @@ type SourcePost struct {
 	name string
 }
 
-func (s SourcePost) GetName() string {
+func (s SourcePost) Type() string {
+	return "Post"
+}
+
+func (s SourcePost) Name() string {
 	return s.name
 }

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/cavaliergopher/grab/v3"
+	"github.com/samber/lo"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"net/http"
@@ -165,4 +166,26 @@ func TestFetch_DownloadFile_Error(t *testing.T) {
 	resp := fetch.DownloadFile(request)
 
 	assert.Error(t, resp.Err())
+}
+
+func TestFetch_DownloadFiles(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("file content"))
+	}))
+
+	defer server.Close()
+
+	requests := lo.Map([]int{1, 2, 3}, func(i int, _ int) *grab.Request {
+		r, _ := grab.NewRequest(fmt.Sprintf("testfile%d.txt", i), server.URL)
+		return r
+	})
+
+	fetch := New(nil, 0)
+	result := fetch.DownloadFiles(requests, 1)
+
+	for resp := range result {
+		assert.NoError(t, resp.Err())
+		assert.Equal(t, int64(len("file content")), resp.Size())
+	}
 }

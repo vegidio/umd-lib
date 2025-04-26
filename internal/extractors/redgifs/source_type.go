@@ -5,7 +5,11 @@ type SourceVideo struct {
 	name string
 }
 
-func (s SourceVideo) GetName() string {
+func (s SourceVideo) Type() string {
+	return "Video"
+}
+
+func (s SourceVideo) Name() string {
 	return s.name
 }
 
@@ -14,6 +18,10 @@ type SourceUser struct {
 	name string
 }
 
-func (s SourceUser) GetName() string {
+func (s SourceUser) Type() string {
+	return "User"
+}
+
+func (s SourceUser) Name() string {
 	return s.name
 }

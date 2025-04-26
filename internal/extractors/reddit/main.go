@@ -32,7 +32,11 @@ func New(url string, metadata model.Metadata, callback func(event event.Event), 
 	return nil
 }
 
-func (r *Reddit) GetSourceType() (model.SourceType, error) {
+func (r *Reddit) Type() model.ExtractorType {
+	return model.Reddit
+}
+
+func (r *Reddit) SourceType() (model.SourceType, error) {
 	regexSubmission := regexp.MustCompile(`/(?:r|u|user)/([^/?]+)/comments/([^/\n?]+)`)
 	regexUser := regexp.MustCompile(`/(?:u|user)/([^/\n?]+)`)
 	regexSubreddit := regexp.MustCompile(`/r/([^/\n]+)`)
@@ -79,7 +83,7 @@ func (r *Reddit) QueryMedia(limit int, extensions []string, deep bool) (*model.R
 	}
 
 	if r.source == nil {
-		r.source, err = r.GetSourceType()
+		r.source, err = r.SourceType()
 		if err != nil {
 			return nil, err
 		}
@@ -113,7 +117,7 @@ func (r *Reddit) fetchMedia(source model.SourceType, limit int, extensions []str
 	after := ""
 
 	sourceName := strings.TrimPrefix(reflect.TypeOf(source).Name(), "Source")
-	name := source.GetName()
+	name := source.Name()
 
 	for {
 		var submission *Submission

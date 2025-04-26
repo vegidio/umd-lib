@@ -5,7 +5,6 @@ import (
 	"github.com/samber/lo"
 	log "github.com/sirupsen/logrus"
 	"github.com/vegidio/umd-lib/event"
-	"github.com/vegidio/umd-lib/fetch"
 	"github.com/vegidio/umd-lib/internal/model"
 	"github.com/vegidio/umd-lib/internal/utils"
 	"math"
@@ -33,7 +32,11 @@ func New(url string, metadata model.Metadata, callback func(event event.Event), 
 	return nil
 }
 
-func (r *Redgifs) GetSourceType() (model.SourceType, error) {
+func (r *Redgifs) Type() model.ExtractorType {
+	return model.RedGifs
+}
+
+func (r *Redgifs) SourceType() (model.SourceType, error) {
 	regexVideo := regexp.MustCompile(`/(ifr|watch)/([^/\n?]+)`)
 	regexUser := regexp.MustCompile(`/users/([^/\n?]+)`)
 
@@ -72,7 +75,7 @@ func (r *Redgifs) QueryMedia(limit int, extensions []string, deep bool) (*model.
 	}
 
 	if r.source == nil {
-		r.source, err = r.GetSourceType()
+		r.source, err = r.SourceType()
 		if err != nil {
 			return nil, err
 		}
@@ -93,10 +96,6 @@ func (r *Redgifs) QueryMedia(limit int, extensions []string, deep bool) (*model.
 		Extractor: model.RedGifs,
 		Metadata:  r.responseMetadata,
 	}, nil
-}
-
-func (r *Redgifs) GetFetch() fetch.Fetch {
-	return fetch.New(nil, 0)
 }
 
 // Compile-time assertion to ensure the extractor implements the Extractor interface

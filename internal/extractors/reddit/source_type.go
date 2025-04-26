@@ -7,7 +7,11 @@ type SourceSubmission struct {
 	name string
 }
 
-func (s SourceSubmission) GetName() string {
+func (s SourceSubmission) Type() string {
+	return "Submission"
+}
+
+func (s SourceSubmission) Name() string {
 	return s.name
 }
 
@@ -16,7 +20,11 @@ type SourceUser struct {
 	name string
 }
 
-func (s SourceUser) GetName() string {
+func (s SourceUser) Type() string {
+	return "User"
+}
+
+func (s SourceUser) Name() string {
 	return s.name
 }
 
@@ -25,6 +33,10 @@ type SourceSubreddit struct {
 	name string
 }
 
-func (s SourceSubreddit) GetName() string {
+func (s SourceSubreddit) Type() string {
+	return "Subreddit"
+}
+
+func (s SourceSubreddit) Name() string {
 	return s.name
 }

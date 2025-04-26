@@ -3,7 +3,6 @@ package fapello
 import (
 	"fmt"
 	"github.com/vegidio/umd-lib/event"
-	"github.com/vegidio/umd-lib/fetch"
 	"github.com/vegidio/umd-lib/internal/model"
 	"github.com/vegidio/umd-lib/internal/utils"
 	"reflect"
@@ -31,7 +30,11 @@ func New(url string, metadata model.Metadata, callback func(event event.Event), 
 	return nil
 }
 
-func (f *Fapello) GetSourceType() (model.SourceType, error) {
+func (f *Fapello) Type() model.ExtractorType {
+	return model.Fapello
+}
+
+func (f *Fapello) SourceType() (model.SourceType, error) {
 	regexPost := regexp.MustCompile(`/([a-zA-Z0-9-_.]+)/?$`)
 
 	var source model.SourceType
@@ -65,7 +68,7 @@ func (f *Fapello) QueryMedia(limit int, extensions []string, deep bool) (*model.
 	}
 
 	if f.source == nil {
-		f.source, err = f.GetSourceType()
+		f.source, err = f.SourceType()
 		if err != nil {
 			return nil, err
 		}
@@ -86,10 +89,6 @@ func (f *Fapello) QueryMedia(limit int, extensions []string, deep bool) (*model.
 		Extractor: model.Fapello,
 		Metadata:  f.responseMetadata,
 	}, nil
-}
-
-func (f *Fapello) GetFetch() fetch.Fetch {
-	return fetch.New(nil, 0)
 }
 
 // Compile-time assertion to ensure the extractor implements the Extractor interface

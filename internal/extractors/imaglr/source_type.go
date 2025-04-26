@@ -5,6 +5,10 @@ type SourcePost struct {
 	name string
 }
 
-func (s SourcePost) GetName() string {
+func (s SourcePost) Type() string {
+	return "Post"
+}
+
+func (s SourcePost) Name() string {
 	return s.name
 }

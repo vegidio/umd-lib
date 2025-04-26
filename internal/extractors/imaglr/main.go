@@ -30,7 +30,11 @@ func New(url string, metadata model.Metadata, callback func(event event.Event), 
 	return nil
 }
 
-func (i *Imaglr) GetSourceType() (model.SourceType, error) {
+func (i *Imaglr) Type() model.ExtractorType {
+	return model.Imaglr
+}
+
+func (i *Imaglr) SourceType() (model.SourceType, error) {
 	regexPost := regexp.MustCompile(`/post/([^/\n?]+)`)
 
 	var source model.SourceType
@@ -64,7 +68,7 @@ func (i *Imaglr) QueryMedia(limit int, extensions []string, deep bool) (*model.R
 	}
 
 	if i.source == nil {
-		i.source, err = i.GetSourceType()
+		i.source, err = i.SourceType()
 		if err != nil {
 			return nil, err
 		}

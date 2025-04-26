@@ -6,8 +6,11 @@ type External interface {
 
 // Extractor defines the interface for extractors.
 type Extractor interface {
-	// GetSourceType determines the source type of the extractor.
-	GetSourceType() (SourceType, error)
+	// Type returns the name of the extractor.
+	Type() ExtractorType
+
+	// SourceType determines the source type of the extractor.
+	SourceType() (SourceType, error)
 
 	// QueryMedia queries media from the given URL with specified limit and extensions.
 	QueryMedia(limit int, extensions []string, deep bool) (*Response, error)
