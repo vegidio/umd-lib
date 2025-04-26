@@ -27,9 +27,7 @@ func (External) ExpandMedia(media []model.Media, ignoreHost string, metadata *mo
 			sem <- struct{}{}
 
 			if current.Type == model.Unknown && !utils.HasHost(current.Url, ignoreHost) {
-				uObj := New(*metadata, nil)
-
-				extractor, err := uObj.FindExtractor(current.Url)
+				extractor, err := New(*metadata).FindExtractor(current.Url)
 				if err != nil {
 					mu.Lock()
 					result = append(result, current)
@@ -38,8 +36,8 @@ func (External) ExpandMedia(media []model.Media, ignoreHost string, metadata *mo
 					return
 				}
 
-				resp, err := extractor.QueryMedia(1, make([]string, 0), false)
-				if err != nil {
+				resp := extractor.QueryMedia(1, make([]string, 0), false)
+				if resp.Error() != nil {
 					mu.Lock()
 					result = append(result, current)
 					mu.Unlock()

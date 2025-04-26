@@ -10,26 +10,24 @@ import (
 func TestCoomer_QueryUser(t *testing.T) {
 	const NumberOfPosts = 50
 
-	u := umd.New(nil, nil)
-	extractor, _ := u.FindExtractor("https://coomer.su/onlyfans/user/melindalondon")
-	resp, err := extractor.QueryMedia(NumberOfPosts, nil, true)
-	media := resp.Media
+	extractor, _ := umd.New(nil).FindExtractor("https://coomer.su/onlyfans/user/melindalondon")
+	resp := extractor.QueryMedia(NumberOfPosts, nil, true)
+	err := resp.Error()
 
 	assert.NoError(t, err)
-	assert.Equal(t, NumberOfPosts, len(media))
-	assert.Equal(t, "onlyfans", media[0].Metadata["source"])
-	assert.Equal(t, "melindalondon", media[0].Metadata["name"])
+	assert.Equal(t, NumberOfPosts, len(resp.Media))
+	assert.Equal(t, "onlyfans", resp.Media[0].Metadata["source"])
+	assert.Equal(t, "melindalondon", resp.Media[0].Metadata["name"])
 }
 
 func TestCoomer_QueryPost(t *testing.T) {
-	u := umd.New(nil, nil)
-	extractor, _ := u.FindExtractor("https://coomer.su/onlyfans/user/melindalondon/post/357160243")
-	resp, err := extractor.QueryMedia(99999, nil, true)
-	media := resp.Media
+	extractor, _ := umd.New(nil).FindExtractor("https://coomer.su/onlyfans/user/melindalondon/post/357160243")
+	resp := extractor.QueryMedia(99999, nil, true)
+	err := resp.Error()
 
 	assert.NoError(t, err)
-	assert.Equal(t, 1, len(media))
-	assert.Equal(t, model.Image, media[0].Type)
-	assert.Equal(t, "onlyfans", media[0].Metadata["source"])
-	assert.Equal(t, "melindalondon", media[0].Metadata["name"])
+	assert.Equal(t, 1, len(resp.Media))
+	assert.Equal(t, model.Image, resp.Media[0].Type)
+	assert.Equal(t, "onlyfans", resp.Media[0].Metadata["source"])
+	assert.Equal(t, "melindalondon", resp.Media[0].Metadata["name"])
 }

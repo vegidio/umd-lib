@@ -3,10 +3,8 @@ package reddit
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/vegidio/umd-lib/event"
 	"github.com/vegidio/umd-lib/internal/model"
 	"github.com/vegidio/umd-lib/internal/utils"
-	"reflect"
 	"regexp"
 	"strings"
 )
@@ -15,7 +13,6 @@ const Host = "reddit.com"
 
 type Reddit struct {
 	Metadata model.Metadata
-	Callback func(event event.Event)
 
 	url              string
 	source           model.SourceType
@@ -23,10 +20,10 @@ type Reddit struct {
 	external         model.External
 }
 
-func New(url string, metadata model.Metadata, callback func(event event.Event), external model.External) model.Extractor {
+func New(url string, metadata model.Metadata, external model.External) model.Extractor {
 	switch {
 	case utils.HasHost(url, Host):
-		return &Reddit{Metadata: metadata, Callback: callback, url: url, external: external}
+		return &Reddit{Metadata: metadata, url: url, external: external}
 	}
 
 	return nil
@@ -66,44 +63,53 @@ func (r *Reddit) SourceType() (model.SourceType, error) {
 		return nil, fmt.Errorf("source type not found for URL: %s", r.url)
 	}
 
-	if r.Callback != nil {
-		sourceType := strings.TrimPrefix(reflect.TypeOf(source).Name(), "Source")
-		r.Callback(event.OnExtractorTypeFound{Type: sourceType, Name: name})
-	}
-
 	r.source = source
 	return source, nil
 }
 
-func (r *Reddit) QueryMedia(limit int, extensions []string, deep bool) (*model.Response, error) {
+func (r *Reddit) QueryMedia(limit int, extensions []string, deep bool) *model.Response {
 	var err error
 
 	if r.responseMetadata == nil {
 		r.responseMetadata = make(model.Metadata)
 	}
 
-	if r.source == nil {
-		r.source, err = r.SourceType()
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	media, err := r.fetchMedia(r.source, limit, extensions, deep)
-	if err != nil {
-		return nil, err
-	}
-
-	if r.Callback != nil {
-		r.Callback(event.OnQueryCompleted{Total: len(media)})
-	}
-
-	return &model.Response{
+	response := &model.Response{
 		Url:       r.url,
-		Media:     media,
+		Media:     make([]model.Media, 0),
 		Extractor: model.Reddit,
 		Metadata:  r.responseMetadata,
-	}, nil
+		Done:      make(chan error),
+	}
+
+	go func() {
+		defer close(response.Done)
+
+		if r.source == nil {
+			r.source, err = r.SourceType()
+			if err != nil {
+				response.Done <- err
+				return
+			}
+		}
+
+		for result := range r.fetchMedia(r.source, limit, extensions, deep) {
+			if result.Err != nil {
+				response.Done <- result.Err
+				return
+			}
+
+			// Limiting the number of results
+			if utils.MergeMedia(&response.Media, result.Data) >= limit {
+				response.Media = response.Media[:limit]
+				break
+			}
+		}
+
+		response.Done <- nil
+	}()
+
+	return response
 }
 
 // Compile-time assertion to ensure the extractor implements the Extractor interface
@@ -111,55 +117,51 @@ var _ model.Extractor = (*Reddit)(nil)
 
 // region - Private methods
 
-func (r *Reddit) fetchMedia(source model.SourceType, limit int, extensions []string, deep bool) ([]model.Media, error) {
-	media := make([]model.Media, 0)
-	amountQueried := 0
-	after := ""
+func (r *Reddit) fetchMedia(
+	source model.SourceType,
+	limit int,
+	extensions []string,
+	deep bool,
+) <-chan model.Result[[]model.Media] {
+	result := make(chan model.Result[[]model.Media])
 
-	sourceName := strings.TrimPrefix(reflect.TypeOf(source).Name(), "Source")
-	name := source.Name()
+	go func() {
+		defer close(result)
+		after := ""
 
-	for {
-		var submission *Submission
-		var err error
+		for {
+			var submission *Submission
+			var err error
 
-		switch s := source.(type) {
-		case SourceSubmission:
-			submission, err = getSubmission(s.Id)
-		case SourceUser:
-			submission, err = getUserSubmissions(s.name, after, limit)
-		case SourceSubreddit:
-			submission, err = getSubredditSubmissions(s.name, after, limit)
+			switch s := source.(type) {
+			case SourceSubmission:
+				submission, err = getSubmission(s.Id)
+			case SourceUser:
+				submission, err = getUserSubmissions(s.name, after, limit)
+			case SourceSubreddit:
+				submission, err = getSubredditSubmissions(s.name, after, limit)
+			}
+
+			if err != nil {
+				result <- model.Result[[]model.Media]{Err: err}
+				return
+			}
+
+			newMedia := submissionsToMedia(submission.Data.Children, source.Type(), source.Name())
+			if deep {
+				newMedia = r.external.ExpandMedia(newMedia, Host, &r.responseMetadata, 5)
+			}
+
+			after = submission.Data.After
+			result <- model.Result[[]model.Media]{Data: newMedia}
+
+			if len(newMedia) == 0 || after == "" {
+				break
+			}
 		}
+	}()
 
-		if err != nil {
-			return media, err
-		}
-
-		newMedia := submissionsToMedia(submission.Data.Children, sourceName, name)
-
-		if deep {
-			newMedia = r.external.ExpandMedia(newMedia, Host, &r.responseMetadata, 5)
-		}
-
-		media, amountQueried = utils.MergeMedia(media, newMedia)
-
-		if r.Callback != nil {
-			r.Callback(event.OnMediaQueried{Amount: amountQueried})
-		}
-
-		after = submission.Data.After
-		if len(newMedia) == 0 || len(media) >= limit || after == "" {
-			break
-		}
-	}
-
-	// Limiting the number of results
-	if len(media) > limit {
-		media = media[:limit]
-	}
-
-	return media, nil
+	return result
 }
 
 // endregion

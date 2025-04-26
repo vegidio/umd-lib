@@ -2,10 +2,8 @@ package fapello
 
 import (
 	"fmt"
-	"github.com/vegidio/umd-lib/event"
 	"github.com/vegidio/umd-lib/internal/model"
 	"github.com/vegidio/umd-lib/internal/utils"
-	"reflect"
 	"regexp"
 	"strings"
 	"time"
@@ -13,7 +11,6 @@ import (
 
 type Fapello struct {
 	Metadata model.Metadata
-	Callback func(event event.Event)
 
 	url              string
 	source           model.SourceType
@@ -21,10 +18,10 @@ type Fapello struct {
 	external         model.External
 }
 
-func New(url string, metadata model.Metadata, callback func(event event.Event), external model.External) model.Extractor {
+func New(url string, metadata model.Metadata, external model.External) model.Extractor {
 	switch {
 	case utils.HasHost(url, "fapello.com"):
-		return &Fapello{Metadata: metadata, Callback: callback, url: url, external: external}
+		return &Fapello{Metadata: metadata, url: url, external: external}
 	}
 
 	return nil
@@ -51,44 +48,53 @@ func (f *Fapello) SourceType() (model.SourceType, error) {
 		return nil, fmt.Errorf("source type not found for URL: %s", f.url)
 	}
 
-	if f.Callback != nil {
-		sourceType := strings.TrimPrefix(reflect.TypeOf(source).Name(), "Source")
-		f.Callback(event.OnExtractorTypeFound{Type: sourceType, Name: name})
-	}
-
 	f.source = source
 	return source, nil
 }
 
-func (f *Fapello) QueryMedia(limit int, extensions []string, deep bool) (*model.Response, error) {
+func (f *Fapello) QueryMedia(limit int, extensions []string, deep bool) *model.Response {
 	var err error
 
 	if f.responseMetadata == nil {
 		f.responseMetadata = make(model.Metadata)
 	}
 
-	if f.source == nil {
-		f.source, err = f.SourceType()
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	media, err := f.fetchMedia(f.source, limit, extensions, deep)
-	if err != nil {
-		return nil, err
-	}
-
-	if f.Callback != nil {
-		f.Callback(event.OnQueryCompleted{Total: len(media)})
-	}
-
-	return &model.Response{
+	response := &model.Response{
 		Url:       f.url,
-		Media:     media,
+		Media:     make([]model.Media, 0),
 		Extractor: model.Fapello,
 		Metadata:  f.responseMetadata,
-	}, nil
+		Done:      make(chan error),
+	}
+
+	go func() {
+		defer close(response.Done)
+
+		if f.source == nil {
+			f.source, err = f.SourceType()
+			if err != nil {
+				response.Done <- err
+				return
+			}
+		}
+
+		for result := range f.fetchMedia(f.source, limit, extensions, deep) {
+			if result.Err != nil {
+				response.Done <- result.Err
+				return
+			}
+
+			// Limiting the number of results
+			if utils.MergeMedia(&response.Media, result.Data) >= limit {
+				response.Media = response.Media[:limit]
+				break
+			}
+		}
+
+		response.Done <- nil
+	}()
+
+	return response
 }
 
 // Compile-time assertion to ensure the extractor implements the Extractor interface
@@ -96,30 +102,38 @@ var _ model.Extractor = (*Fapello)(nil)
 
 // region - Private methods
 
-func (f *Fapello) fetchMedia(source model.SourceType, limit int, extensions []string, deep bool) ([]model.Media, error) {
-	media := make([]model.Media, 0)
-	var err error
+func (f *Fapello) fetchMedia(
+	source model.SourceType,
+	limit int,
+	extensions []string,
+	_ bool,
+) <-chan model.Result[[]model.Media] {
+	result := make(chan model.Result[[]model.Media])
 
-	switch s := source.(type) {
-	case SourceModel:
-		media, err = f.fetchModel(s, limit)
-	}
+	go func() {
+		defer close(result)
 
-	if err != nil {
-		return media, err
-	}
+		media := make([]model.Media, 0)
+		var err error
 
-	// Limiting the number of results
-	if len(media) > limit {
-		media = media[:limit]
-	}
+		switch s := source.(type) {
+		case SourceModel:
+			media, err = f.fetchModel(s, limit)
+		}
 
-	return media, nil
+		if err != nil {
+			result <- model.Result[[]model.Media]{Err: err}
+			return
+		}
+
+		result <- model.Result[[]model.Media]{Data: media}
+	}()
+
+	return result
 }
 
 func (f *Fapello) fetchModel(source SourceModel, limit int) ([]model.Media, error) {
 	media := make([]model.Media, 0)
-	amountQueried := 0
 	var err error
 
 	links, err := getLinks(source.name, limit)
@@ -134,11 +148,7 @@ func (f *Fapello) fetchModel(source SourceModel, limit int) ([]model.Media, erro
 		}
 
 		newMedia := postsToMedia(*post, "model")
-		media, amountQueried = utils.MergeMedia(media, newMedia)
-
-		if f.Callback != nil {
-			f.Callback(event.OnMediaQueried{Amount: amountQueried})
-		}
+		utils.MergeMedia(&media, newMedia)
 
 		if len(media) >= limit {
 			break

@@ -9,13 +9,12 @@ import (
 func TestFapello_QueryPosts(t *testing.T) {
 	const NumberOfPosts = 91
 
-	u := umd.New(nil, nil)
-	extractor, _ := u.FindExtractor("https://fapello.com/darja-sobakinskaja/")
-	resp, err := extractor.QueryMedia(99999, nil, true)
-	media := resp.Media
+	extractor, _ := umd.New(nil).FindExtractor("https://fapello.com/darja-sobakinskaja/")
+	resp := extractor.QueryMedia(99999, nil, true)
+	err := resp.Error()
 
 	assert.NoError(t, err)
-	assert.Equal(t, NumberOfPosts, len(media))
-	assert.Equal(t, "model", media[0].Metadata["source"])
-	assert.Equal(t, "darja-sobakinskaja", media[0].Metadata["name"])
+	assert.Equal(t, NumberOfPosts, len(resp.Media))
+	assert.Equal(t, "model", resp.Media[0].Metadata["source"])
+	assert.Equal(t, "darja-sobakinskaja", resp.Media[0].Metadata["name"])
 }

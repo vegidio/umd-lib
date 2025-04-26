@@ -13,5 +13,5 @@ type Extractor interface {
 	SourceType() (SourceType, error)
 
 	// QueryMedia queries media from the given URL with specified limit and extensions.
-	QueryMedia(limit int, extensions []string, deep bool) (*Response, error)
+	QueryMedia(limit int, extensions []string, deep bool) *Response
 }

@@ -17,9 +17,9 @@ func TestRedGifs_DownloadVideo(t *testing.T) {
 	const FilePath = "video.mp4"
 	_ = os.Remove(FilePath)
 
-	u := umd.New(nil, nil)
-	extractor, _ := u.FindExtractor("https://www.redgifs.com/watch/sturdycuddlyicefish")
-	resp, _ := extractor.QueryMedia(99999, nil, true)
+	extractor, _ := umd.New(nil).FindExtractor("https://www.redgifs.com/watch/sturdycuddlyicefish")
+	resp := extractor.QueryMedia(99999, nil, true)
+	<-resp.Done
 
 	media := resp.Media[0]
 	request, _ := grab.NewRequest("video.mp4", media.Url)
@@ -33,16 +33,14 @@ func TestRedGifs_DownloadVideo(t *testing.T) {
 }
 
 func TestRedGifs_FetchUser(t *testing.T) {
-	u := umd.New(nil, nil)
-	extractor, _ := u.FindExtractor("https://www.redgifs.com/users/atomicbrunette18")
-	resp, err := extractor.QueryMedia(180, nil, true)
-
-	media := resp.Media[0]
+	extractor, _ := umd.New(nil).FindExtractor("https://www.redgifs.com/users/atomicbrunette18")
+	resp := extractor.QueryMedia(180, nil, true)
+	err := resp.Error()
 
 	assert.NoError(t, err)
 	assert.Equal(t, 180, len(resp.Media))
-	assert.Equal(t, "user", media.Metadata["source"])
-	assert.Equal(t, "atomicbrunette18", media.Metadata["name"])
+	assert.Equal(t, "user", resp.Media[0].Metadata["source"])
+	assert.Equal(t, "atomicbrunette18", resp.Media[0].Metadata["name"])
 }
 
 func TestRedGifs_ReuseToken(t *testing.T) {
@@ -52,14 +50,16 @@ func TestRedGifs_ReuseToken(t *testing.T) {
 	log.SetLevel(log.DebugLevel)
 
 	// First query
-	u := umd.New(nil, nil)
+	u := umd.New(nil)
 	extractor, _ := u.FindExtractor("https://www.redgifs.com/watch/sturdycuddlyicefish")
-	resp, _ := extractor.QueryMedia(99999, nil, true)
+	r1 := extractor.QueryMedia(99999, nil, true)
+	<-r1.Done
 
 	// Second query
-	u = umd.New(resp.Metadata, nil)
+	u = umd.New(r1.Metadata)
 	extractor, _ = u.FindExtractor("https://www.redgifs.com/watch/ecstaticthickasiansmallclawedotter")
-	_, _ = extractor.QueryMedia(99999, nil, true)
+	r2 := extractor.QueryMedia(99999, nil, true)
+	<-r2.Done
 
 	// Check the log output
 	output := buf.String()

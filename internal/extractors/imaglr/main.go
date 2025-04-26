@@ -3,17 +3,14 @@ package imaglr
 import (
 	"fmt"
 	"github.com/samber/lo"
-	"github.com/vegidio/umd-lib/event"
 	"github.com/vegidio/umd-lib/internal/model"
 	"github.com/vegidio/umd-lib/internal/utils"
-	"reflect"
 	"regexp"
 	"strings"
 )
 
 type Imaglr struct {
 	Metadata model.Metadata
-	Callback func(event event.Event)
 
 	url              string
 	source           model.SourceType
@@ -21,10 +18,10 @@ type Imaglr struct {
 	external         model.External
 }
 
-func New(url string, metadata model.Metadata, callback func(event event.Event), external model.External) model.Extractor {
+func New(url string, metadata model.Metadata, external model.External) model.Extractor {
 	switch {
 	case utils.HasHost(url, "imaglr.com"):
-		return &Imaglr{Metadata: metadata, Callback: callback, url: url, external: external}
+		return &Imaglr{Metadata: metadata, url: url, external: external}
 	}
 
 	return nil
@@ -51,44 +48,53 @@ func (i *Imaglr) SourceType() (model.SourceType, error) {
 		return nil, fmt.Errorf("source type not found for URL: %s", i.url)
 	}
 
-	if i.Callback != nil {
-		sourceType := strings.TrimPrefix(reflect.TypeOf(source).Name(), "Source")
-		i.Callback(event.OnExtractorTypeFound{Type: sourceType, Name: id})
-	}
-
 	i.source = source
 	return source, nil
 }
 
-func (i *Imaglr) QueryMedia(limit int, extensions []string, deep bool) (*model.Response, error) {
+func (i *Imaglr) QueryMedia(limit int, extensions []string, deep bool) *model.Response {
 	var err error
 
 	if i.responseMetadata == nil {
 		i.responseMetadata = make(model.Metadata)
 	}
 
-	if i.source == nil {
-		i.source, err = i.SourceType()
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	media, err := i.fetchMedia(i.source, limit, extensions, deep)
-	if err != nil {
-		return nil, err
-	}
-
-	if i.Callback != nil {
-		i.Callback(event.OnQueryCompleted{Total: len(media)})
-	}
-
-	return &model.Response{
+	response := &model.Response{
 		Url:       i.url,
-		Media:     media,
+		Media:     make([]model.Media, 0),
 		Extractor: model.Imaglr,
 		Metadata:  i.responseMetadata,
-	}, nil
+		Done:      make(chan error),
+	}
+
+	go func() {
+		defer close(response.Done)
+
+		if i.source == nil {
+			i.source, err = i.SourceType()
+			if err != nil {
+				response.Done <- err
+				return
+			}
+		}
+
+		for result := range i.fetchMedia(i.source, limit, extensions, deep) {
+			if result.Err != nil {
+				response.Done <- result.Err
+				return
+			}
+
+			// Limiting the number of results
+			if utils.MergeMedia(&response.Media, result.Data) >= limit {
+				response.Media = response.Media[:limit]
+				break
+			}
+		}
+
+		response.Done <- nil
+	}()
+
+	return response
 }
 
 // Compile-time assertion to ensure the extractor implements the Extractor interface
@@ -96,30 +102,35 @@ var _ model.Extractor = (*Imaglr)(nil)
 
 // region - Private methods
 
-func (i *Imaglr) fetchMedia(source model.SourceType, limit int, extensions []string, deep bool) ([]model.Media, error) {
-	media := make([]model.Media, 0)
-	posts := make([]Post, 0)
-	amountQueried := 0
-	var err error
+func (i *Imaglr) fetchMedia(
+	source model.SourceType,
+	limit int,
+	extensions []string,
+	_ bool,
+) <-chan model.Result[[]model.Media] {
+	result := make(chan model.Result[[]model.Media])
 
-	switch s := source.(type) {
-	case SourcePost:
-		posts, err = i.fetchPost(s)
-	}
+	go func() {
+		defer close(result)
 
-	if err != nil {
-		return media, err
-	}
+		posts := make([]Post, 0)
+		var err error
 
-	sourceName := strings.TrimPrefix(reflect.TypeOf(source).Name(), "Source")
-	newMedia := postsToMedia(posts, sourceName)
-	media, amountQueried = utils.MergeMedia(media, newMedia)
+		switch s := source.(type) {
+		case SourcePost:
+			posts, err = i.fetchPost(s)
+		}
 
-	if i.Callback != nil {
-		i.Callback(event.OnMediaQueried{Amount: amountQueried})
-	}
+		if err != nil {
+			result <- model.Result[[]model.Media]{Err: err}
+			return
+		}
 
-	return media, nil
+		media := postsToMedia(posts, source.Name())
+		result <- model.Result[[]model.Media]{Data: media}
+	}()
+
+	return result
 }
 
 func (i *Imaglr) fetchPost(source SourcePost) ([]Post, error) {

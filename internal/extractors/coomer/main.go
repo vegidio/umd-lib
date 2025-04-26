@@ -2,17 +2,13 @@ package coomer
 
 import (
 	"fmt"
-	"github.com/vegidio/umd-lib/event"
 	"github.com/vegidio/umd-lib/internal/model"
 	"github.com/vegidio/umd-lib/internal/utils"
-	"reflect"
 	"regexp"
-	"strings"
 )
 
 type Coomer struct {
 	Metadata model.Metadata
-	Callback func(event event.Event)
 
 	url              string
 	extractor        model.ExtractorType
@@ -22,14 +18,13 @@ type Coomer struct {
 	external         model.External
 }
 
-func New(url string, metadata model.Metadata, callback func(event event.Event), external model.External) model.Extractor {
+func New(url string, metadata model.Metadata, external model.External) model.Extractor {
 	switch {
 	case utils.HasHost(url, "coomer.su") || utils.HasHost(url, "coomer.party"):
 		baseUrl = "https://coomer.su"
 
 		return &Coomer{
 			Metadata: metadata,
-			Callback: callback,
 
 			url:       url,
 			extractor: model.Coomer,
@@ -41,7 +36,6 @@ func New(url string, metadata model.Metadata, callback func(event event.Event), 
 
 		return &Coomer{
 			Metadata: metadata,
-			Callback: callback,
 
 			url:       url,
 			extractor: model.Kemono,
@@ -83,44 +77,53 @@ func (c *Coomer) SourceType() (model.SourceType, error) {
 		return nil, fmt.Errorf("source type not found for URL: %s", c.url)
 	}
 
-	if c.Callback != nil {
-		sourceType := strings.TrimPrefix(reflect.TypeOf(source).Name(), "Source")
-		c.Callback(event.OnExtractorTypeFound{Type: sourceType, Name: user})
-	}
-
 	c.source = source
 	return source, nil
 }
 
-func (c *Coomer) QueryMedia(limit int, extensions []string, deep bool) (*model.Response, error) {
+func (c *Coomer) QueryMedia(limit int, extensions []string, deep bool) *model.Response {
 	var err error
 
 	if c.responseMetadata == nil {
 		c.responseMetadata = make(model.Metadata)
 	}
 
-	if c.source == nil {
-		c.source, err = c.SourceType()
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	media, err := c.fetchMedia(c.source, limit, extensions, deep)
-	if err != nil {
-		return nil, err
-	}
-
-	if c.Callback != nil {
-		c.Callback(event.OnQueryCompleted{Total: len(media)})
-	}
-
-	return &model.Response{
+	response := &model.Response{
 		Url:       c.url,
-		Media:     media,
+		Media:     make([]model.Media, 0),
 		Extractor: c.extractor,
 		Metadata:  c.responseMetadata,
-	}, nil
+		Done:      make(chan error),
+	}
+
+	go func() {
+		defer close(response.Done)
+
+		if c.source == nil {
+			c.source, err = c.SourceType()
+			if err != nil {
+				response.Done <- err
+				return
+			}
+		}
+
+		for result := range c.fetchMedia(c.source, limit, extensions, deep) {
+			if result.Err != nil {
+				response.Done <- result.Err
+				return
+			}
+
+			// Limiting the number of results
+			if utils.MergeMedia(&response.Media, result.Data) >= limit {
+				response.Media = response.Media[:limit]
+				break
+			}
+		}
+
+		response.Done <- nil
+	}()
+
+	return response
 }
 
 // Compile-time assertion to ensure the extractor implements the Extractor interface
@@ -128,32 +131,40 @@ var _ model.Extractor = (*Coomer)(nil)
 
 // region - Private methods
 
-func (c *Coomer) fetchMedia(source model.SourceType, limit int, extensions []string, _ bool) ([]model.Media, error) {
-	media := make([]model.Media, 0)
-	var err error
+func (c *Coomer) fetchMedia(
+	source model.SourceType,
+	limit int,
+	extensions []string,
+	_ bool,
+) <-chan model.Result[[]model.Media] {
+	result := make(chan model.Result[[]model.Media])
 
-	switch s := source.(type) {
-	case SourceUser:
-		media, err = c.fetchUserMedia(s, limit, extensions)
-	case SourcePost:
-		media, err = c.fetchPostMedia(s, limit, extensions)
-	}
+	go func() {
+		defer close(result)
 
-	if err != nil {
-		return media, err
-	}
+		media := make([]model.Media, 0)
+		var err error
 
-	// Limiting the number of results
-	if len(media) > limit {
-		media = media[:limit]
-	}
+		switch s := source.(type) {
+		case SourceUser:
+			media, err = c.fetchUserMedia(s, limit, extensions)
+		case SourcePost:
+			media, err = c.fetchPostMedia(s, limit, extensions)
+		}
 
-	return media, nil
+		if err != nil {
+			result <- model.Result[[]model.Media]{Err: err}
+			return
+		}
+
+		result <- model.Result[[]model.Media]{Data: media}
+	}()
+
+	return result
 }
 
 func (c *Coomer) fetchUserMedia(source SourceUser, limit int, extensions []string) ([]model.Media, error) {
 	media := make([]model.Media, 0)
-	amountQueried := 0
 	results := getUser(source.Service, source.name)
 
 	for result := range results {
@@ -162,11 +173,7 @@ func (c *Coomer) fetchUserMedia(source SourceUser, limit int, extensions []strin
 		}
 
 		newMedia := c.postToMedia(result.Data)
-
-		media, amountQueried = utils.MergeMedia(media, newMedia)
-		if c.Callback != nil && amountQueried > 0 {
-			c.Callback(event.OnMediaQueried{Amount: amountQueried})
-		}
+		utils.MergeMedia(&media, newMedia)
 
 		// Limiting the number of results
 		if len(media) >= limit {
@@ -179,7 +186,6 @@ func (c *Coomer) fetchUserMedia(source SourceUser, limit int, extensions []strin
 
 func (c *Coomer) fetchPostMedia(source SourcePost, limit int, extensions []string) ([]model.Media, error) {
 	media := make([]model.Media, 0)
-	amountQueried := 0
 
 	response, err := getPost(source.Service, source.name, source.Id)
 	if err != nil {
@@ -187,11 +193,7 @@ func (c *Coomer) fetchPostMedia(source SourcePost, limit int, extensions []strin
 	}
 
 	newMedia := c.postToMedia(*response)
-
-	media, amountQueried = utils.MergeMedia(media, newMedia)
-	if c.Callback != nil && amountQueried > 0 {
-		c.Callback(event.OnMediaQueried{Amount: amountQueried})
-	}
+	utils.MergeMedia(&media, newMedia)
 
 	return media, nil
 }
