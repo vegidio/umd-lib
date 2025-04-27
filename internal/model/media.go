@@ -66,7 +66,7 @@ func getExtension(urStr string) string {
 		return ""
 	}
 
-	return ext[1:]
+	return strings.ToLower(ext[1:])
 }
 
 func getType(extension string) MediaType {

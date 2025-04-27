@@ -5,7 +5,6 @@ import (
 	"github.com/cavaliergopher/grab/v3"
 	"github.com/go-resty/resty/v2"
 	"github.com/go-rod/rod"
-	"github.com/panjf2000/ants/v2"
 	log "github.com/sirupsen/logrus"
 	"sync"
 	"time"
@@ -209,25 +208,34 @@ func (f Fetch) DownloadFile(request *grab.Request) *grab.Response {
 // Returns:
 //   - <-chan *grab.Response: a channel through which the download responses are sent.
 func (f Fetch) DownloadFiles(requests []*grab.Request, parallel int) <-chan *grab.Response {
-	var wg sync.WaitGroup
 	result := make(chan *grab.Response)
-	pool, _ := ants.NewPool(parallel)
 
 	go func() {
-		defer pool.Release()
 		defer close(result)
+
+		var wg sync.WaitGroup
+		sem := make(chan struct{}, parallel)
 
 		for _, request := range requests {
 			wg.Add(1)
 
-			_ = pool.Submit(func() {
-				defer wg.Done()
-				resp := f.DownloadFile(request)
+			go func(r *grab.Request) {
+				defer func() {
+					<-sem
+					wg.Done()
+				}()
+
+				sem <- struct{}{}
+				resp := f.DownloadFile(r)
 				result <- resp
-			})
+
+				// Waiting for the download the complete continuing
+				_ = resp.Err()
+			}(request)
 		}
 
 		wg.Wait()
+		close(sem)
 	}()
 
 	return result

@@ -32,15 +32,20 @@ func (f *Fapello) Type() model.ExtractorType {
 }
 
 func (f *Fapello) SourceType() (model.SourceType, error) {
-	regexPost := regexp.MustCompile(`/([a-zA-Z0-9-_.]+)/?$`)
+	regexPost := regexp.MustCompile(`com/([a-zA-Z0-9-_.]+)/(\d+)`)
+	regexModel := regexp.MustCompile(`com/([a-zA-Z0-9-_.]+)/?`)
 
 	var source model.SourceType
-	var name string
 
 	switch {
 	case regexPost.MatchString(f.url):
 		matches := regexPost.FindStringSubmatch(f.url)
-		name = matches[1]
+		name := matches[1]
+		id := matches[2]
+		source = SourcePost{Id: id, name: name}
+	case regexModel.MatchString(f.url):
+		matches := regexModel.FindStringSubmatch(f.url)
+		name := matches[1]
 		source = SourceModel{name: name}
 	}
 
@@ -112,50 +117,71 @@ func (f *Fapello) fetchMedia(
 
 	go func() {
 		defer close(result)
-
-		media := make([]model.Media, 0)
-		var err error
+		var posts <-chan model.Result[Post]
 
 		switch s := source.(type) {
+		case SourcePost:
+			posts = f.fetchPost(s)
 		case SourceModel:
-			media, err = f.fetchModel(s, limit)
+			posts = f.fetchModel(s, limit)
 		}
 
-		if err != nil {
-			result <- model.Result[[]model.Media]{Err: err}
-			return
-		}
+		for post := range posts {
+			if post.Err != nil {
+				result <- model.Result[[]model.Media]{Err: post.Err}
+				return
+			}
 
-		result <- model.Result[[]model.Media]{Data: media}
+			media := postsToMedia(post.Data, source.Type())
+			result <- model.Result[[]model.Media]{Data: media}
+		}
 	}()
 
 	return result
 }
 
-func (f *Fapello) fetchModel(source SourceModel, limit int) ([]model.Media, error) {
-	media := make([]model.Media, 0)
-	var err error
+func (f *Fapello) fetchPost(source SourcePost) <-chan model.Result[Post] {
+	result := make(chan model.Result[Post])
 
-	links, err := getLinks(source.name, limit)
-	if err != nil {
-		return media, err
-	}
+	go func() {
+		defer close(result)
 
-	for _, link := range links {
-		post, postErr := getPost(link, source.name)
-		if postErr != nil {
-			return media, err
+		link := fmt.Sprintf("https://fapello.com/%s/%s", source.name, source.Id)
+
+		post, err := getPost(link, source.name)
+		if err != nil {
+			result <- model.Result[Post]{Err: err}
 		}
 
-		newMedia := postsToMedia(*post, "model")
-		utils.MergeMedia(&media, newMedia)
+		result <- model.Result[Post]{Data: *post}
+	}()
 
-		if len(media) >= limit {
-			break
+	return result
+}
+
+func (f *Fapello) fetchModel(source SourceModel, limit int) <-chan model.Result[Post] {
+	result := make(chan model.Result[Post])
+
+	go func() {
+		defer close(result)
+
+		links, err := getLinks(source.name, limit)
+		if err != nil {
+			result <- model.Result[Post]{Err: err}
+			return
 		}
-	}
 
-	return media, nil
+		for _, link := range links {
+			post, postErr := getPost(link, source.name)
+			if postErr != nil {
+				result <- model.Result[Post]{Err: postErr}
+			}
+
+			result <- model.Result[Post]{Data: *post}
+		}
+	}()
+
+	return result
 }
 
 // endregion
