@@ -97,8 +97,6 @@ func (r *Redgifs) QueryMedia(limit int, extensions []string, deep bool) *model.R
 				break
 			}
 		}
-
-		response.Done <- nil
 	}()
 
 	return response
@@ -151,7 +149,7 @@ func (r *Redgifs) fetchMedia(
 
 	go func() {
 		defer close(result)
-		gifs := make([]Gif, 0)
+		var gifs <-chan model.Result[[]Gif]
 
 		token, err := r.getNewOrSavedToken()
 		if err != nil {
@@ -161,62 +159,79 @@ func (r *Redgifs) fetchMedia(
 
 		switch s := source.(type) {
 		case SourceVideo:
-			gifs, err = r.fetchGif(s, token)
+			gifs = r.fetchGif(s, token)
 		case SourceUser:
-			gifs, err = r.fetchUser(s, token, limit)
+			gifs = r.fetchUser(s, token, limit)
 		}
 
-		if err != nil {
-			result <- model.Result[[]model.Media]{Err: err}
-			return
-		}
+		for gif := range gifs {
+			if gif.Err != nil {
+				result <- model.Result[[]model.Media]{Err: gif.Err}
+				return
+			}
 
-		media := videosToMedia(gifs, source.Type())
-		result <- model.Result[[]model.Media]{Data: media}
+			media := videosToMedia(gif.Data, source.Type())
+			result <- model.Result[[]model.Media]{Data: media}
+		}
 	}()
 
 	return result
 }
 
-func (r *Redgifs) fetchGif(source SourceVideo, token string) ([]Gif, error) {
-	response, err := getGif(
-		fmt.Sprintf("Bearer %s", token),
-		fmt.Sprintf("https://www.redgifs.com/watch/%s", source.name),
-		source.name,
-	)
+func (r *Redgifs) fetchGif(source SourceVideo, token string) <-chan model.Result[[]Gif] {
+	result := make(chan model.Result[[]Gif])
 
-	if err != nil {
-		return make([]Gif, 0), err
-	}
+	go func() {
+		defer close(result)
 
-	return []Gif{response.Gif}, nil
-}
+		response, err := getGif(
+			fmt.Sprintf("Bearer %s", token),
+			fmt.Sprintf("https://www.redgifs.com/watch/%s", source.name),
+			source.name,
+		)
 
-func (r *Redgifs) fetchUser(source SourceUser, token string, limit int) ([]Gif, error) {
-	gifs := make([]Gif, 0)
-
-	bearer := fmt.Sprintf("Bearer %s", token)
-	url := fmt.Sprintf("https://www.redgifs.com/users/%s", source.name)
-	response, err := getUser(bearer, url, source.name, 1)
-
-	if err != nil {
-		return gifs, err
-	}
-
-	gifs = append(gifs, response.Gifs...)
-	maxPages := math.Ceil(float64(limit) / 100)
-	numPages := int(math.Min(float64(response.Pages), maxPages))
-
-	for i := 2; i <= numPages; i++ {
-		response, err = getUser(bearer, url, source.name, i)
 		if err != nil {
-			return gifs, err
+			result <- model.Result[[]Gif]{Err: err}
+			return
 		}
 
-		gifs = append(gifs, response.Gifs...)
-	}
+		result <- model.Result[[]Gif]{Data: []Gif{response.Gif}}
+	}()
 
-	return gifs, nil
+	return result
+}
+
+func (r *Redgifs) fetchUser(source SourceUser, token string, limit int) <-chan model.Result[[]Gif] {
+	result := make(chan model.Result[[]Gif])
+
+	go func() {
+		defer close(result)
+
+		bearer := fmt.Sprintf("Bearer %s", token)
+		url := fmt.Sprintf("https://www.redgifs.com/users/%s", source.name)
+		response, err := getUser(bearer, url, source.name, 1)
+
+		if err != nil {
+			result <- model.Result[[]Gif]{Err: err}
+			return
+		}
+
+		result <- model.Result[[]Gif]{Data: response.Gifs}
+		maxPages := math.Ceil(float64(limit) / 100)
+		numPages := int(math.Min(float64(response.Pages), maxPages))
+
+		for i := 2; i <= numPages; i++ {
+			response, err = getUser(bearer, url, source.name, i)
+			if err != nil {
+				result <- model.Result[[]Gif]{Err: err}
+				return
+			}
+
+			result <- model.Result[[]Gif]{Data: response.Gifs}
+		}
+	}()
+
+	return result
 }
 
 // endregion

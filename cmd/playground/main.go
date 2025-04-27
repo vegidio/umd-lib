@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	log "github.com/sirupsen/logrus"
 	"github.com/vegidio/umd-lib"
 	"time"
@@ -16,7 +15,7 @@ func main() {
 	})
 
 	extractor, err := umd.New(nil).
-		FindExtractor("https://www.reddit.com/user/atomicbrunette18/")
+		FindExtractor("https://www.redgifs.com/users/atomicbrunette18")
 
 	if err != nil {
 		log.Error(err)
@@ -38,16 +37,21 @@ func main() {
 }
 
 func queryUpdates(resp *umd.Response) error {
-	ticker := time.NewTicker(500 * time.Millisecond)
+	ticker := time.NewTicker(100 * time.Millisecond)
 	defer ticker.Stop()
+	oldValue := -1
 
 	for {
 		select {
 		case <-ticker.C:
-			fmt.Println("Size:", len(resp.Media))
+			size := len(resp.Media)
+			if size != oldValue {
+				oldValue = size
+				log.Info("Size: ", size)
+			}
 
 		case <-resp.Done:
-			fmt.Println("Size:", len(resp.Media))
+			log.Info("Size: ", len(resp.Media))
 			return resp.Error()
 		}
 	}
