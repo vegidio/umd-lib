@@ -6,7 +6,6 @@ import (
 	"github.com/go-resty/resty/v2"
 	"github.com/go-rod/rod"
 	log "github.com/sirupsen/logrus"
-	"sync"
 	"time"
 )
 
@@ -188,67 +187,7 @@ func (f Fetch) GetHtml(page *rod.Page, url string, element string) (string, erro
 	return html, err
 }
 
-// DownloadFile attempts to download a file.
-//
-// Parameters:
-//   - request: a *grab.Request containing the file URL and other settings.
-//
-// Returns:
-//   - *grab.Response: the response from the download.
-func (f Fetch) DownloadFile(request *grab.Request) *grab.Response {
-	return f.grabClient.Do(request)
-}
-
-// DownloadFiles downloads multiple files concurrently using a worker pool.
-//
-// Parameters:
-//   - requests: a slice of *grab.Request objects representing the files to be downloaded.
-//   - parallel: the number of concurrent workers to use for downloading.
-//
-// Returns:
-//   - <-chan *grab.Response: a channel through which the download responses are sent.
-func (f Fetch) DownloadFiles(requests []*grab.Request, parallel int) <-chan *grab.Response {
-	result := make(chan *grab.Response)
-
-	go func() {
-		defer close(result)
-
-		var wg sync.WaitGroup
-		sem := make(chan struct{}, parallel)
-
-		for _, request := range requests {
-			wg.Add(1)
-
-			go func(r *grab.Request) {
-				defer func() {
-					<-sem
-					wg.Done()
-				}()
-
-				sem <- struct{}{}
-				resp := f.DownloadFile(r)
-				result <- resp
-
-				// Waiting for the download the complete continuing
-				_ = resp.Err()
-			}(request)
-		}
-
-		wg.Wait()
-		close(sem)
-	}()
-
-	return result
-}
-
 // region - Private functions
-
-func fibonacci(n int) int {
-	if n <= 1 {
-		return n
-	}
-	return fibonacci(n-1) + fibonacci(n-2)
-}
 
 func replaceError(err error, fallback error) error {
 	if err != nil {
