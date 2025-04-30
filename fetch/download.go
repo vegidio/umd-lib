@@ -2,7 +2,9 @@ package fetch
 
 import (
 	"fmt"
+	"github.com/dromara/dongle"
 	log "github.com/sirupsen/logrus"
+	"github.com/zeebo/blake3"
 	"io"
 	"net/http"
 	"os"
@@ -34,6 +36,7 @@ func (f Fetch) DownloadFile(request *Request) *Response {
 
 		response.Request = request
 
+		// File Writer
 		file, err := os.Create(request.FilePath)
 		if err != nil {
 			response.err = fmt.Errorf("failed to create file: %w", err)
@@ -152,6 +155,9 @@ func (f Fetch) sendAndRetry(response *Response, file *os.File) {
 		}
 	}()
 
+	// Hash Writer
+	hasher := blake3.New()
+
 	for attempt := 0; attempt <= f.retries; attempt++ {
 		// It means we already sent the request at least once, so the subsequent requests should have some sort of
 		// backoff strategy before sending the request again.
@@ -187,11 +193,17 @@ func (f Fetch) sendAndRetry(response *Response, file *os.File) {
 			},
 		}
 
-		_, err = io.Copy(pw, resp.Body)
+		// Multi Writer
+		mw := io.MultiWriter(pw, hasher)
+
+		_, err = io.Copy(mw, resp.Body)
 		if err != nil {
 			err = fmt.Errorf("failed to copy response body: %w", err)
 			continue
 		}
+
+		sum := hasher.Sum(nil)
+		response.Hash = dongle.Encode.FromBytes(sum).ByBase91().ToString()
 
 		break
 	}

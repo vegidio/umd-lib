@@ -26,7 +26,7 @@ func main() {
 		return
 	}
 
-	log.Info("Download successful")
+	log.Info("Download successful; Hash: ", resp.Hash)
 }
 
 func queryUpdates(resp *fetch.Response) error {

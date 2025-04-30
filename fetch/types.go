@@ -21,6 +21,7 @@ type Response struct {
 	Size       int64
 	Downloaded int64
 	Progress   float64
+	Hash       string
 	Done       chan struct{}
 	err        error
 }
