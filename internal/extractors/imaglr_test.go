@@ -1,7 +1,6 @@
 package extractors
 
 import (
-	"github.com/cavaliergopher/grab/v3"
 	"github.com/stretchr/testify/assert"
 	"github.com/vegidio/umd-lib"
 	"github.com/vegidio/umd-lib/fetch"
@@ -19,10 +18,10 @@ func TestImaglr_DownloadVideo(t *testing.T) {
 	<-resp.Done
 
 	media := resp.Media[0]
-	request, _ := grab.NewRequest("video.mp4", media.Url)
+	request := &fetch.Request{Url: media.Url, FilePath: "video.mp4"}
 	f := fetch.New(nil, 0)
 	downloadResponse := f.DownloadFile(request)
 
-	assert.NoError(t, downloadResponse.Err())
-	assert.Equal(t, int64(75_520_497), downloadResponse.Size())
+	assert.NoError(t, downloadResponse.Error())
+	assert.Equal(t, int64(75_520_497), downloadResponse.Size)
 }

@@ -2,7 +2,6 @@ package extractors
 
 import (
 	"bytes"
-	"github.com/cavaliergopher/grab/v3"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/vegidio/umd-lib"
@@ -22,12 +21,12 @@ func TestRedGifs_DownloadVideo(t *testing.T) {
 	<-resp.Done
 
 	media := resp.Media[0]
-	request, _ := grab.NewRequest("video.mp4", media.Url)
+	request := &fetch.Request{Url: media.Url, FilePath: "video.mp4"}
 	f := fetch.New(nil, 0)
 	downloadResponse := f.DownloadFile(request)
 
-	assert.NoError(t, downloadResponse.Err())
-	assert.Equal(t, int64(15_212_770), downloadResponse.Size())
+	assert.NoError(t, downloadResponse.Error())
+	assert.Equal(t, int64(15_212_770), downloadResponse.Size)
 	assert.Equal(t, "sturdycuddlyicefish", media.Metadata["id"])
 	assert.Equal(t, "sonya_18yo", media.Metadata["name"])
 }

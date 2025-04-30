@@ -2,7 +2,6 @@ package fetch
 
 import (
 	"fmt"
-	"github.com/cavaliergopher/grab/v3"
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"net/http"
@@ -24,11 +23,11 @@ func TestFetch_DownloadFile(t *testing.T) {
 	defer server.Close()
 
 	fetch := New(nil, 0)
-	request, _ := grab.NewRequest(FilePath, server.URL)
+	request := &Request{server.URL, FilePath}
 	resp := fetch.DownloadFile(request)
 
-	assert.NoError(t, resp.Err())
-	assert.Equal(t, int64(len("file content")), resp.Size())
+	assert.NoError(t, resp.Error())
+	assert.Equal(t, int64(len("file content")), resp.Size)
 }
 
 func TestFetch_DownloadFile_UserAgent(t *testing.T) {
@@ -44,10 +43,10 @@ func TestFetch_DownloadFile_UserAgent(t *testing.T) {
 	defer server.Close()
 
 	fetch := New(nil, 0)
-	request, _ := grab.NewRequest(FilePath, server.URL)
+	request := &Request{server.URL, FilePath}
 	resp := fetch.DownloadFile(request)
 
-	assert.NoError(t, resp.Err())
+	assert.NoError(t, resp.Error())
 
 	byteArray, _ := resp.Bytes()
 	assert.Contains(t, string(byteArray), "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko)")
@@ -59,10 +58,10 @@ func TestFetch_DownloadFile_Error(t *testing.T) {
 	_ = os.Remove(FilePath)
 
 	fetch := New(nil, 0)
-	request, _ := grab.NewRequest(FilePath, "http://invalid-url")
+	request := &Request{"http://invalid-url", FilePath}
 	resp := fetch.DownloadFile(request)
 
-	assert.Error(t, resp.Err())
+	assert.Error(t, resp.Error())
 }
 
 func TestFetch_DownloadFiles(t *testing.T) {
@@ -73,8 +72,8 @@ func TestFetch_DownloadFiles(t *testing.T) {
 
 	defer server.Close()
 
-	requests := lo.Map([]int{1, 2, 3}, func(i int, _ int) *grab.Request {
-		r, _ := grab.NewRequest(fmt.Sprintf("testfile%d.txt", i), server.URL)
+	requests := lo.Map([]int{1, 2, 3}, func(i int, _ int) *Request {
+		r := &Request{server.URL, fmt.Sprintf("testfile%d.txt", i)}
 		return r
 	})
 
@@ -82,7 +81,7 @@ func TestFetch_DownloadFiles(t *testing.T) {
 	result := fetch.DownloadFiles(requests, 1)
 
 	for resp := range result {
-		assert.NoError(t, resp.Err())
-		assert.Equal(t, int64(len("file content")), resp.Size())
+		assert.NoError(t, resp.Error())
+		assert.Equal(t, int64(len("file content")), resp.Size)
 	}
 }

@@ -2,7 +2,7 @@ package main
 
 import (
 	log "github.com/sirupsen/logrus"
-	"github.com/vegidio/umd-lib"
+	"github.com/vegidio/umd-lib/fetch"
 	"time"
 )
 
@@ -14,44 +14,36 @@ func main() {
 		TimestampFormat: "2006-01-02 15:04:05.000",
 	})
 
-	extractor, err := umd.New(nil).
-		FindExtractor("https://www.redgifs.com/users/atomicbrunette18")
+	f := fetch.New(nil, 1)
 
-	if err != nil {
-		log.Error(err)
+	resp := f.DownloadFile(&fetch.Request{
+		Url:      "https://httpbingo.org/json",
+		FilePath: "test.json",
+	})
+
+	if err := queryUpdates(resp); err != nil {
+		log.Error("Failed to download")
 		return
 	}
 
-	log.Info("Extractor..: ", extractor.Type().String())
-
-	source, _ := extractor.SourceType()
-	log.Info("Source Type: ", source.Type())
-	log.Info("Source Name: ", source.Name())
-
-	resp := extractor.QueryMedia(99_999, nil, true)
-	if err = queryUpdates(resp); err != nil {
-		log.Error(err)
-	}
-
-	log.Info("Amount.....: ", len(resp.Media))
+	log.Info("Download successful")
 }
 
-func queryUpdates(resp *umd.Response) error {
-	ticker := time.NewTicker(100 * time.Millisecond)
+func queryUpdates(resp *fetch.Response) error {
+	ticker := time.NewTicker(500 * time.Millisecond)
 	defer ticker.Stop()
-	oldValue := -1
+	oldValue := int64(0)
 
 	for {
 		select {
 		case <-ticker.C:
-			size := len(resp.Media)
-			if size != oldValue {
-				oldValue = size
-				log.Info("Size: ", size)
+			if oldValue != resp.Downloaded {
+				oldValue = resp.Downloaded
+				log.Info("Downloaded: ", resp.Downloaded, "; Progress: ", resp.Progress)
 			}
 
 		case <-resp.Done:
-			log.Info("Size: ", len(resp.Media))
+			log.Info("Downloaded: ", resp.Downloaded, "; Total: ", resp.Size)
 			return resp.Error()
 		}
 	}

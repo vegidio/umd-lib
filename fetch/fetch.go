@@ -2,7 +2,6 @@ package fetch
 
 import (
 	"fmt"
-	"github.com/cavaliergopher/grab/v3"
 	"github.com/go-resty/resty/v2"
 	"github.com/go-rod/rod"
 	log "github.com/sirupsen/logrus"
@@ -11,7 +10,7 @@ import (
 
 type Fetch struct {
 	restClient *resty.Client
-	grabClient *grab.Client
+	headers    map[string]string
 	retries    int
 }
 
@@ -28,8 +27,6 @@ func New(headers map[string]string, retries int) Fetch {
 
 	f := resty.New()
 	f.SetHeader("User-Agent", userAgent)
-	g := grab.NewClient()
-	g.UserAgent = userAgent
 
 	return Fetch{
 		restClient: f.
@@ -57,8 +54,7 @@ func New(headers map[string]string, retries int) Fetch {
 				},
 			),
 
-		grabClient: g,
-		retries:    retries,
+		retries: retries,
 	}
 }
 

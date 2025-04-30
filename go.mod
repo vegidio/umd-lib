@@ -4,7 +4,6 @@ go 1.23.2
 
 require (
 	github.com/PuerkitoBio/goquery v1.10.3
-	github.com/cavaliergopher/grab/v3 v3.0.1
 	github.com/go-resty/resty/v2 v2.16.5
 	github.com/go-rod/rod v0.116.2
 	github.com/samber/lo v1.49.1
