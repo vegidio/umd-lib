@@ -3,7 +3,9 @@ package fetch
 import (
 	"fmt"
 	"io"
+	"net/http"
 	"os"
+	"time"
 )
 
 // Request
@@ -11,6 +13,8 @@ import (
 type Request struct {
 	Url      string
 	FilePath string
+
+	httpReq *http.Request
 }
 
 // Response
@@ -53,14 +57,44 @@ func (r *Response) Bytes() ([]byte, error) {
 	return data, nil
 }
 
+// Track monitors the progress of the download and invokes the provided callback function with the current progress
+// details. The callback receives the number of bytes downloaded, the total size of the file, and the progress
+// percentage.
+//
+// # Parameters:
+//   - callback: A function that takes three arguments: completed bytes (int64), total bytes (int64),
+//     and progress percentage (float64).
+//
+// # Returns:
+//   - An error if one occurred during the download process.
+func (r *Response) Track(callback func(completed, total int64, progress float64)) error {
+	ticker := time.NewTicker(100 * time.Millisecond)
+	defer ticker.Stop()
+	oldValue := int64(-1)
+
+	for {
+		select {
+		case <-ticker.C:
+			if r.Downloaded != oldValue {
+				oldValue = r.Downloaded
+				callback(r.Downloaded, r.Size, r.Progress)
+			}
+
+		case <-r.Done:
+			if r.Downloaded != oldValue {
+				oldValue = r.Downloaded
+				callback(r.Downloaded, r.Size, r.Progress)
+			}
+			return r.Error()
+		}
+	}
+}
+
 // ProgressWriter
 
 type progressWriter struct {
-	file       io.Writer
-	downloaded int64
-	total      int64
-	progress   float64
-	callback   func(downloaded int64, progress float64)
+	file     io.Writer
+	callback func(downloaded int64)
 }
 
 func (pw *progressWriter) Write(p []byte) (int, error) {
@@ -69,13 +103,8 @@ func (pw *progressWriter) Write(p []byte) (int, error) {
 		return n, err
 	}
 
-	pw.downloaded += int64(n)
-	if pw.total > 0 {
-		pw.progress = float64(pw.downloaded) / float64(pw.total)
-	}
-
 	if pw.callback != nil {
-		pw.callback(pw.downloaded, pw.progress)
+		pw.callback(int64(n))
 	}
 
 	return n, nil

@@ -3,7 +3,6 @@ package main
 import (
 	log "github.com/sirupsen/logrus"
 	"github.com/vegidio/umd-lib/fetch"
-	"time"
 )
 
 func main() {
@@ -16,35 +15,17 @@ func main() {
 
 	f := fetch.New(nil, 1)
 
-	resp := f.DownloadFile(&fetch.Request{
-		Url:      "https://httpbingo.org/json",
-		FilePath: "test.json",
+	request, _ := f.NewRequest("https://httpbingo.org/json", "test.json")
+	resp := f.DownloadFile(request)
+
+	err := resp.Track(func(completed, total int64, progress float64) {
+		log.Info("Downloaded: ", completed, "; Total: ", total, "; Progress: ", progress)
 	})
 
-	if err := queryUpdates(resp); err != nil {
+	if err != nil {
 		log.Error("Failed to download")
 		return
 	}
 
 	log.Info("Download successful; Hash: ", resp.Hash)
-}
-
-func queryUpdates(resp *fetch.Response) error {
-	ticker := time.NewTicker(500 * time.Millisecond)
-	defer ticker.Stop()
-	oldValue := int64(0)
-
-	for {
-		select {
-		case <-ticker.C:
-			if oldValue != resp.Downloaded {
-				oldValue = resp.Downloaded
-				log.Info("Downloaded: ", resp.Downloaded, "; Progress: ", resp.Progress)
-			}
-
-		case <-resp.Done:
-			log.Info("Downloaded: ", resp.Downloaded, "; Total: ", resp.Size)
-			return resp.Error()
-		}
-	}
 }

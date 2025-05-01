@@ -23,7 +23,7 @@ func TestFetch_DownloadFile(t *testing.T) {
 	defer server.Close()
 
 	fetch := New(nil, 0)
-	request := &Request{server.URL, FilePath}
+	request, _ := fetch.NewRequest(server.URL, FilePath)
 	resp := fetch.DownloadFile(request)
 
 	assert.NoError(t, resp.Error())
@@ -43,7 +43,7 @@ func TestFetch_DownloadFile_UserAgent(t *testing.T) {
 	defer server.Close()
 
 	fetch := New(nil, 0)
-	request := &Request{server.URL, FilePath}
+	request, _ := fetch.NewRequest(server.URL, FilePath)
 	resp := fetch.DownloadFile(request)
 
 	assert.NoError(t, resp.Error())
@@ -58,7 +58,7 @@ func TestFetch_DownloadFile_Error(t *testing.T) {
 	_ = os.Remove(FilePath)
 
 	fetch := New(nil, 0)
-	request := &Request{"http://invalid-url", FilePath}
+	request, _ := fetch.NewRequest("http://invalid-url", FilePath)
 	resp := fetch.DownloadFile(request)
 
 	assert.Error(t, resp.Error())
@@ -72,12 +72,12 @@ func TestFetch_DownloadFiles(t *testing.T) {
 
 	defer server.Close()
 
+	fetch := New(nil, 0)
 	requests := lo.Map([]int{1, 2, 3}, func(i int, _ int) *Request {
-		r := &Request{server.URL, fmt.Sprintf("testfile%d.txt", i)}
+		r, _ := fetch.NewRequest(server.URL, fmt.Sprintf("testfile%d.txt", i))
 		return r
 	})
 
-	fetch := New(nil, 0)
 	result := fetch.DownloadFiles(requests, 1)
 
 	for resp := range result {

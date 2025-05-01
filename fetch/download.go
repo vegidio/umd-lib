@@ -12,6 +12,36 @@ import (
 	"time"
 )
 
+// NewRequest creates a new download request with the specified URL and file path.
+//
+// Parameters:
+//   - url: The URL to download the file from.
+//   - filePath: The path where the downloaded file will be saved.
+//
+// Returns:
+//   - A Request object containing the URL and file path.
+//   - An error if the request creation fails.
+func (f Fetch) NewRequest(url string, filePath string) (*Request, error) {
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	for key, value := range f.headers {
+		req.Header.Set(key, value)
+	}
+
+	// Set the User-Agent header
+	req.Header.Set("User-Agent", userAgent)
+
+	// Create a new Request object
+	return &Request{
+		Url:      url,
+		FilePath: filePath,
+		httpReq:  req,
+	}, nil
+}
+
 // DownloadFile downloads a single file based on the provided request.
 //
 // Parameters:
@@ -28,14 +58,6 @@ func (f Fetch) DownloadFile(request *Request) *Response {
 	go func() {
 		defer close(response.Done)
 
-		_, err := f.createHttpRequest(request)
-		if err != nil {
-			response.err = fmt.Errorf("failed to create request: %w", err)
-			return
-		}
-
-		response.Request = request
-
 		// File Writer
 		file, err := os.Create(request.FilePath)
 		if err != nil {
@@ -45,7 +67,30 @@ func (f Fetch) DownloadFile(request *Request) *Response {
 
 		defer file.Close()
 
-		f.sendAndRetry(response, file)
+		// Progress Writer
+		pw := &progressWriter{
+			file: file,
+			callback: func(downloaded int64) {
+				response.Downloaded += downloaded
+				if response.Size < response.Downloaded {
+					response.Size = response.Downloaded
+				}
+				if response.Size > 0 {
+					response.Progress = float64(response.Downloaded) / float64(response.Size)
+				}
+			},
+		}
+
+		// Hash Writer
+		hasher := blake3.New()
+
+		// Multi Writer
+		mw := io.MultiWriter(pw, hasher)
+
+		f.sendAndRetry(response, mw)
+
+		sum := hasher.Sum(nil)
+		response.Hash = dongle.Encode.FromBytes(sum).ByBase91().ToString()
 	}()
 
 	return response
@@ -93,59 +138,9 @@ func (f Fetch) DownloadFiles(requests []*Request, parallel int) <-chan *Response
 	return result
 }
 
-// TrackProgress monitors the progress of a file download and invokes a callback function.
-//
-// Parameters:
-//   - resp: a *Response representing the download response to track.
-//   - callback: a function that takes three parameters (completed, total, progress) and is called
-//     whenever the download progress updates.
-//
-// Returns:
-//   - error: an error if the download fails or completes with an error.
-func TrackProgress(
-	resp *Response,
-	callback func(completed, total int64, progress float64),
-) error {
-	ticker := time.NewTicker(100 * time.Millisecond)
-	defer ticker.Stop()
-	oldValue := int64(-1)
-
-	for {
-		select {
-		case <-ticker.C:
-			downloaded := resp.Downloaded
-			if downloaded != oldValue {
-				oldValue = downloaded
-				callback(downloaded, resp.Size, resp.Progress)
-			}
-
-		case <-resp.Done:
-			return resp.Error()
-		}
-	}
-}
-
 // region - Private functions
 
-func (f Fetch) createHttpRequest(request *Request) (*http.Request, error) {
-	req, err := http.NewRequest("GET", request.Url, nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
-	}
-
-	// Add the user agent to the request
-	req.Header.Set("User-Agent", userAgent)
-
-	// Add any additional headers to the request
-	for key, value := range f.headers {
-		req.Header.Set(key, value)
-	}
-
-	return req, nil
-}
-
-func (f Fetch) sendAndRetry(response *Response, file *os.File) {
-	client := &http.Client{}
+func (f Fetch) sendAndRetry(response *Response, mw io.Writer) {
 	var resp *http.Response
 	var err error
 
@@ -154,9 +149,6 @@ func (f Fetch) sendAndRetry(response *Response, file *os.File) {
 			_ = resp.Body.Close()
 		}
 	}()
-
-	// Hash Writer
-	hasher := blake3.New()
 
 	for attempt := 0; attempt <= f.retries; attempt++ {
 		// It means we already sent the request at least once, so the subsequent requests should have some sort of
@@ -173,9 +165,10 @@ func (f Fetch) sendAndRetry(response *Response, file *os.File) {
 			time.Sleep(sleep)
 		}
 
-		req, _ := f.createHttpRequest(response.Request)
+		request, _ := f.NewRequest(response.Request.Url, response.Request.FilePath)
+		response.Request = request
 
-		resp, err = client.Do(req)
+		resp, err = f.httpClient.Do(response.Request.httpReq)
 		if err != nil {
 			err = fmt.Errorf("failed to send request: %w", err)
 			continue
@@ -184,26 +177,11 @@ func (f Fetch) sendAndRetry(response *Response, file *os.File) {
 		response.StatusCode = resp.StatusCode
 		response.Size = resp.ContentLength
 
-		pw := &progressWriter{
-			file:  file,
-			total: resp.ContentLength,
-			callback: func(downloaded int64, progress float64) {
-				response.Downloaded = downloaded
-				response.Progress = progress
-			},
-		}
-
-		// Multi Writer
-		mw := io.MultiWriter(pw, hasher)
-
 		_, err = io.Copy(mw, resp.Body)
 		if err != nil {
 			err = fmt.Errorf("failed to copy response body: %w", err)
 			continue
 		}
-
-		sum := hasher.Sum(nil)
-		response.Hash = dongle.Encode.FromBytes(sum).ByBase91().ToString()
 
 		break
 	}

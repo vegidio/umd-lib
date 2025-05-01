@@ -18,8 +18,8 @@ func TestImaglr_DownloadVideo(t *testing.T) {
 	<-resp.Done
 
 	media := resp.Media[0]
-	request := &fetch.Request{Url: media.Url, FilePath: "video.mp4"}
 	f := fetch.New(nil, 0)
+	request, _ := f.NewRequest(media.Url, "video.mp4")
 	downloadResponse := f.DownloadFile(request)
 
 	assert.NoError(t, downloadResponse.Error())

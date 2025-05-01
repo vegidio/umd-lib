@@ -5,11 +5,13 @@ import (
 	"github.com/go-resty/resty/v2"
 	"github.com/go-rod/rod"
 	log "github.com/sirupsen/logrus"
+	"net/http"
 	"time"
 )
 
 type Fetch struct {
 	restClient *resty.Client
+	httpClient *http.Client
 	headers    map[string]string
 	retries    int
 }
@@ -53,6 +55,8 @@ func New(headers map[string]string, retries int) Fetch {
 					return false
 				},
 			),
+
+		httpClient: &http.Client{},
 
 		retries: retries,
 	}
