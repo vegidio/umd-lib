@@ -55,8 +55,8 @@ func New(headers map[string]string, retries int) Fetch {
 					return false
 				},
 			),
-
-		httpClient: &http.Client{},
+			
+		httpClient: newIdleTimeoutClient(30 * time.Second),
 
 		retries: retries,
 	}

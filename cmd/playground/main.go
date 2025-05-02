@@ -13,9 +13,9 @@ func main() {
 		TimestampFormat: "2006-01-02 15:04:05.000",
 	})
 
-	f := fetch.New(nil, 1)
+	f := fetch.New(nil, 10)
 
-	request, _ := f.NewRequest("https://httpbingo.org/json", "test.json")
+	request, _ := f.NewRequest("https://pub-821312cfd07a4061bf7b99c1f23ed29b.r2.dev/3dicons-png-dynamic-1.0.0.zip", "test.bin")
 	resp := f.DownloadFile(request)
 
 	err := resp.Track(func(completed, total int64, progress float64) {
@@ -27,5 +27,5 @@ func main() {
 		return
 	}
 
-	log.Info("Download successful; Hash: ", resp.Hash)
+	log.Info("Download successful")
 }

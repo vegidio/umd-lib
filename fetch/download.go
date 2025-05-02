@@ -2,9 +2,7 @@ package fetch
 
 import (
 	"fmt"
-	"github.com/dromara/dongle"
 	log "github.com/sirupsen/logrus"
-	"github.com/zeebo/blake3"
 	"io"
 	"net/http"
 	"os"
@@ -58,39 +56,40 @@ func (f Fetch) DownloadFile(request *Request) *Response {
 	go func() {
 		defer close(response.Done)
 
-		// File Writer
-		file, err := os.Create(request.FilePath)
+		// How many bytes are already on disk?
+		var offset int64
+		if info, err := os.Stat(request.FilePath); err == nil {
+			offset = info.Size()
+		}
+
+		// Open (or create) file for appending
+		file, err := os.OpenFile(request.FilePath, os.O_CREATE|os.O_WRONLY, 0o644)
 		if err != nil {
-			response.err = fmt.Errorf("failed to create file: %w", err)
+			response.err = fmt.Errorf("could not open file: %w", err)
 			return
 		}
 
 		defer file.Close()
 
-		// Progress Writer
+		// Seek to the end of existing data
+		if _, fErr := file.Seek(offset, io.SeekStart); fErr != nil {
+			response.err = fmt.Errorf("could not seek: %w", fErr)
+			return
+		}
+
+		// Set up the progress callback
 		pw := &progressWriter{
 			file: file,
 			callback: func(downloaded int64) {
 				response.Downloaded += downloaded
-				if response.Size < response.Downloaded {
-					response.Size = response.Downloaded
-				}
 				if response.Size > 0 {
 					response.Progress = float64(response.Downloaded) / float64(response.Size)
 				}
 			},
 		}
 
-		// Hash Writer
-		hasher := blake3.New()
-
-		// Multi Writer
-		mw := io.MultiWriter(pw, hasher)
-
-		f.sendAndRetry(response, mw)
-
-		sum := hasher.Sum(nil)
-		response.Hash = dongle.Encode.FromBytes(sum).ByBase91().ToString()
+		// Perform the download (with resume & retries)
+		f.downloadWithRetries(response, offset, file, pw)
 	}()
 
 	return response
@@ -140,54 +139,113 @@ func (f Fetch) DownloadFiles(requests []*Request, parallel int) <-chan *Response
 
 // region - Private functions
 
-func (f Fetch) sendAndRetry(response *Response, mw io.Writer) {
+func (f Fetch) downloadWithRetries(response *Response, offset int64, file *os.File, writer io.Writer) {
 	var resp *http.Response
 	var err error
 
-	defer func() {
-		if resp != nil {
-			_ = resp.Body.Close()
-		}
-	}()
-
 	for attempt := 0; attempt <= f.retries; attempt++ {
-		// It means we already sent the request at least once, so the subsequent requests should have some sort of
-		// backoff strategy before sending the request again.
 		if attempt > 0 {
-			sleep := time.Duration(fibonacci(attempt+1)) * time.Second
+			backoff := time.Duration(fibonacci(attempt+1)) * time.Second
 
 			log.WithFields(log.Fields{
 				"attempt": attempt,
 				"error":   err,
 				"url":     response.Request.Url,
-			}).Warn("failed to download file; retrying in ", sleep)
+			}).Warn("failed to download file; retrying in ", backoff)
 
-			time.Sleep(sleep)
+			time.Sleep(backoff)
 		}
 
-		request, _ := f.NewRequest(response.Request.Url, response.Request.FilePath)
-		response.Request = request
+		isRangeReq := offset > 0
+		if isRangeReq {
+			response.Request.httpReq.Header.Set("Range", fmt.Sprintf("bytes=%d-", offset))
+		} else {
+			response.Request.httpReq.Header.Del("Range")
+		}
 
+		// Send it
 		resp, err = f.httpClient.Do(response.Request.httpReq)
 		if err != nil {
-			err = fmt.Errorf("failed to send request: %w", err)
+			response.err = fmt.Errorf("request error: %w", err)
 			continue
 		}
 
-		response.StatusCode = resp.StatusCode
-		response.Size = resp.ContentLength
+		defer resp.Body.Close()
 
-		_, err = io.Copy(mw, resp.Body)
+		// Fallback if server doesn’t support Range
+		if isRangeReq && resp.StatusCode == http.StatusOK {
+			// Truncate file and reset offset
+			if tErr := file.Truncate(0); tErr != nil {
+				response.StatusCode = resp.StatusCode
+				response.Size = 0
+				response.err = fmt.Errorf("truncate failed: %w", tErr)
+			}
+
+			offset = 0
+
+			if _, sErr := file.Seek(0, io.SeekStart); sErr != nil {
+				response.StatusCode = resp.StatusCode
+				response.Size = 0
+				response.err = fmt.Errorf("seek after truncate failed: %w", sErr)
+			}
+
+			attempt-- // retry same attempt count with fresh download
+			continue
+		}
+
+		response.Downloaded = offset
+
+		// Handle '416 Range Not Satisfiable' (already complete)
+		if resp.StatusCode == http.StatusRequestedRangeNotSatisfiable {
+			response.StatusCode = resp.StatusCode
+			response.Size = offset
+			break
+		}
+
+		// Only accept 2xx
+		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+			response.err = fmt.Errorf("unexpected status: %d", resp.StatusCode)
+			continue
+		}
+
+		// Compute total size from Content-Range or Content-Length
+		if cr := resp.Header.Get("Content-Range"); cr != "" {
+			// e.g. "bytes 500-999/1234"
+			var start, end, total int64
+			if _, scanErr := fmt.Sscanf(cr, "bytes %d-%d/%d", &start, &end, &total); scanErr == nil {
+				response.Size = total
+			} else {
+				response.Size = offset + resp.ContentLength
+			}
+		} else {
+			response.Size = offset + resp.ContentLength
+		}
+
+		// Track where this attempt started
+		startOffset := offset
+
+		// Actually copy data
+		_, err = io.Copy(writer, resp.Body)
 		if err != nil {
-			err = fmt.Errorf("failed to copy response body: %w", err)
+			// figure out how many bytes actually made it to disk
+			newOffset, seekErr := file.Seek(0, io.SeekEnd)
+			if seekErr != nil {
+				response.err = fmt.Errorf("seek after partial download failed: %w", seekErr)
+				break
+			}
+
+			// bump offset to resume after what we have
+			offset = newOffset
+			response.err = fmt.Errorf("download interrupted (wrote %d bytes), will resume: %w",
+				newOffset-startOffset, err)
 			continue
 		}
 
+		// Success
+		response.StatusCode = resp.StatusCode
+		response.err = nil
 		break
 	}
-
-	response.err = err
-	response.Done <- struct{}{}
 }
 
 func fibonacci(n int) int {
