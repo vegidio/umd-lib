@@ -145,15 +145,15 @@ func (r *Redgifs) fetchMedia(
 	extensions []string,
 	_ bool,
 ) <-chan model.Result[[]model.Media] {
-	result := make(chan model.Result[[]model.Media])
+	out := make(chan model.Result[[]model.Media])
 
 	go func() {
-		defer close(result)
+		defer close(out)
 		var gifs <-chan model.Result[[]Gif]
 
 		token, err := r.getNewOrSavedToken()
 		if err != nil {
-			result <- model.Result[[]model.Media]{Err: err}
+			out <- model.Result[[]model.Media]{Err: err}
 			return
 		}
 
@@ -166,16 +166,16 @@ func (r *Redgifs) fetchMedia(
 
 		for gif := range gifs {
 			if gif.Err != nil {
-				result <- model.Result[[]model.Media]{Err: gif.Err}
+				out <- model.Result[[]model.Media]{Err: gif.Err}
 				return
 			}
 
 			media := videosToMedia(gif.Data, source.Type())
-			result <- model.Result[[]model.Media]{Data: media}
+			out <- model.Result[[]model.Media]{Data: media}
 		}
 	}()
 
-	return result
+	return out
 }
 
 func (r *Redgifs) fetchGif(source SourceVideo, token string) <-chan model.Result[[]Gif] {

@@ -95,8 +95,6 @@ func (f *Fapello) QueryMedia(limit int, extensions []string, deep bool) *model.R
 				break
 			}
 		}
-
-		response.Done <- nil
 	}()
 
 	return response
@@ -113,10 +111,10 @@ func (f *Fapello) fetchMedia(
 	extensions []string,
 	_ bool,
 ) <-chan model.Result[[]model.Media] {
-	result := make(chan model.Result[[]model.Media])
+	out := make(chan model.Result[[]model.Media])
 
 	go func() {
-		defer close(result)
+		defer close(out)
 		var posts <-chan model.Result[Post]
 
 		switch s := source.(type) {
@@ -128,16 +126,16 @@ func (f *Fapello) fetchMedia(
 
 		for post := range posts {
 			if post.Err != nil {
-				result <- model.Result[[]model.Media]{Err: post.Err}
+				out <- model.Result[[]model.Media]{Err: post.Err}
 				return
 			}
 
 			media := postsToMedia(post.Data, source.Type())
-			result <- model.Result[[]model.Media]{Data: media}
+			out <- model.Result[[]model.Media]{Data: media}
 		}
 	}()
 
-	return result
+	return out
 }
 
 func (f *Fapello) fetchPost(source SourcePost) <-chan model.Result[Post] {

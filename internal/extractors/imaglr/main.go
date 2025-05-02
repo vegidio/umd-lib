@@ -90,8 +90,6 @@ func (i *Imaglr) QueryMedia(limit int, extensions []string, deep bool) *model.Re
 				break
 			}
 		}
-
-		response.Done <- nil
 	}()
 
 	return response
@@ -108,10 +106,10 @@ func (i *Imaglr) fetchMedia(
 	extensions []string,
 	_ bool,
 ) <-chan model.Result[[]model.Media] {
-	result := make(chan model.Result[[]model.Media])
+	out := make(chan model.Result[[]model.Media])
 
 	go func() {
-		defer close(result)
+		defer close(out)
 
 		posts := make([]Post, 0)
 		var err error
@@ -122,15 +120,15 @@ func (i *Imaglr) fetchMedia(
 		}
 
 		if err != nil {
-			result <- model.Result[[]model.Media]{Err: err}
+			out <- model.Result[[]model.Media]{Err: err}
 			return
 		}
 
 		media := postsToMedia(posts, source.Name())
-		result <- model.Result[[]model.Media]{Data: media}
+		out <- model.Result[[]model.Media]{Data: media}
 	}()
 
-	return result
+	return out
 }
 
 func (i *Imaglr) fetchPost(source SourcePost) ([]Post, error) {

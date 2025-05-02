@@ -107,7 +107,7 @@ func (c *Coomer) QueryMedia(limit int, extensions []string, deep bool) *model.Re
 			}
 		}
 
-		for result := range c.fetchMedia(c.source, limit, extensions, deep) {
+		for result := range c.fetchMedia(c.source, extensions, deep) {
 			if result.Err != nil {
 				response.Done <- result.Err
 				return
@@ -119,8 +119,6 @@ func (c *Coomer) QueryMedia(limit int, extensions []string, deep bool) *model.Re
 				break
 			}
 		}
-
-		response.Done <- nil
 	}()
 
 	return response
@@ -133,69 +131,34 @@ var _ model.Extractor = (*Coomer)(nil)
 
 func (c *Coomer) fetchMedia(
 	source model.SourceType,
-	limit int,
 	extensions []string,
 	_ bool,
 ) <-chan model.Result[[]model.Media] {
-	result := make(chan model.Result[[]model.Media])
+	out := make(chan model.Result[[]model.Media])
 
 	go func() {
-		defer close(result)
-
-		media := make([]model.Media, 0)
-		var err error
+		defer close(out)
+		var responses <-chan model.Result[Response]
 
 		switch s := source.(type) {
 		case SourceUser:
-			media, err = c.fetchUserMedia(s, limit, extensions)
+			responses = getUser(s.Service, s.name)
 		case SourcePost:
-			media, err = c.fetchPostMedia(s, limit, extensions)
+			responses = getPost(s.Service, s.name, s.Id)
 		}
 
-		if err != nil {
-			result <- model.Result[[]model.Media]{Err: err}
-			return
-		}
+		for response := range responses {
+			if response.Err != nil {
+				out <- model.Result[[]model.Media]{Err: response.Err}
+				return
+			}
 
-		result <- model.Result[[]model.Media]{Data: media}
+			media := c.postToMedia(response.Data)
+			out <- model.Result[[]model.Media]{Data: media}
+		}
 	}()
 
-	return result
-}
-
-func (c *Coomer) fetchUserMedia(source SourceUser, limit int, extensions []string) ([]model.Media, error) {
-	media := make([]model.Media, 0)
-	results := getUser(source.Service, source.name)
-
-	for result := range results {
-		if result.Err != nil {
-			return media, result.Err
-		}
-
-		newMedia := c.postToMedia(result.Data)
-		utils.MergeMedia(&media, newMedia)
-
-		// Limiting the number of results
-		if len(media) >= limit {
-			break
-		}
-	}
-
-	return media, nil
-}
-
-func (c *Coomer) fetchPostMedia(source SourcePost, limit int, extensions []string) ([]model.Media, error) {
-	media := make([]model.Media, 0)
-
-	response, err := getPost(source.Service, source.name, source.Id)
-	if err != nil {
-		return media, err
-	}
-
-	newMedia := c.postToMedia(*response)
-	utils.MergeMedia(&media, newMedia)
-
-	return media, nil
+	return out
 }
 
 func (c *Coomer) postToMedia(response Response) []model.Media {

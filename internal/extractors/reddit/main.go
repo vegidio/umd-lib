@@ -105,8 +105,6 @@ func (r *Reddit) QueryMedia(limit int, extensions []string, deep bool) *model.Re
 				break
 			}
 		}
-
-		response.Done <- nil
 	}()
 
 	return response
@@ -123,10 +121,10 @@ func (r *Reddit) fetchMedia(
 	extensions []string,
 	deep bool,
 ) <-chan model.Result[[]model.Media] {
-	result := make(chan model.Result[[]model.Media])
+	out := make(chan model.Result[[]model.Media])
 
 	go func() {
-		defer close(result)
+		defer close(out)
 		after := ""
 
 		for {
@@ -143,7 +141,7 @@ func (r *Reddit) fetchMedia(
 			}
 
 			if err != nil {
-				result <- model.Result[[]model.Media]{Err: err}
+				out <- model.Result[[]model.Media]{Err: err}
 				return
 			}
 
@@ -153,7 +151,7 @@ func (r *Reddit) fetchMedia(
 			}
 
 			after = submission.Data.After
-			result <- model.Result[[]model.Media]{Data: newMedia}
+			out <- model.Result[[]model.Media]{Data: newMedia}
 
 			if len(newMedia) == 0 || after == "" {
 				break
@@ -161,7 +159,7 @@ func (r *Reddit) fetchMedia(
 		}
 	}()
 
-	return result
+	return out
 }
 
 // endregion

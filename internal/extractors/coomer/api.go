@@ -10,11 +10,11 @@ var f = fetch.New(nil, 10)
 var baseUrl string
 
 func getUser(service string, user string) <-chan model.Result[Response] {
-	result := make(chan model.Result[Response])
+	out := make(chan model.Result[Response])
 
 	go func() {
 		offset := 0
-		defer close(result)
+		defer close(out)
 
 		for {
 			var posts []Post
@@ -22,9 +22,9 @@ func getUser(service string, user string) <-chan model.Result[Response] {
 			resp, err := f.GetResult(url, nil, &posts)
 
 			if err != nil {
-				result <- model.Result[Response]{Err: err}
+				out <- model.Result[Response]{Err: err}
 			} else if resp.IsError() {
-				result <- model.Result[Response]{Err: fmt.Errorf("error fetching user '%s' posts: %s", user,
+				out <- model.Result[Response]{Err: fmt.Errorf("error fetching user '%s' posts: %s", user,
 					resp.Status())}
 			}
 
@@ -33,32 +33,43 @@ func getUser(service string, user string) <-chan model.Result[Response] {
 			}
 
 			for _, post := range posts {
-				response, postErr := getPost(post.Service, post.User, post.Id)
-				if postErr != nil {
-					result <- model.Result[Response]{Err: postErr}
+				result := <-getPost(post.Service, post.User, post.Id)
+				if result.Err != nil {
+					out <- model.Result[Response]{Err: result.Err}
 					continue
 				}
 
-				result <- model.Result[Response]{Data: *response}
+				out <- model.Result[Response]{Data: result.Data}
 			}
 
 			offset += 50
 		}
 	}()
 
-	return result
+	return out
 }
 
-func getPost(service string, user string, id string) (*Response, error) {
-	var response *Response
-	url := fmt.Sprintf(baseUrl+"/api/v1/%s/user/%s/post/%s", service, user, id)
-	resp, err := f.GetResult(url, nil, &response)
+func getPost(service string, user string, id string) <-chan model.Result[Response] {
+	out := make(chan model.Result[Response])
 
-	if err != nil {
-		return nil, err
-	} else if resp.IsError() {
-		return nil, fmt.Errorf("error fetching user '%s' posts: %s", user, resp.Status())
-	}
+	go func() {
+		defer close(out)
 
-	return response, nil
+		var response Response
+		url := fmt.Sprintf(baseUrl+"/api/v1/%s/user/%s/post/%s", service, user, id)
+		resp, err := f.GetResult(url, nil, &response)
+
+		if err != nil {
+			out <- model.Result[Response]{Err: err}
+			return
+		} else if resp.IsError() {
+			out <- model.Result[Response]{Err: fmt.Errorf("error fetching user '%s' posts: %s",
+				user, resp.Status())}
+			return
+		}
+
+		out <- model.Result[Response]{Data: response}
+	}()
+
+	return out
 }
