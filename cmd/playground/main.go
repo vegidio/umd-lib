@@ -8,16 +8,22 @@ import (
 
 func main() {
 	//log.SetOutput(io.Discard)
-	log.SetLevel(log.DebugLevel)
+	//log.SetLevel(log.DebugLevel)
 	log.SetFormatter(&log.TextFormatter{
 		FullTimestamp:   true,
 		TimestampFormat: "2006-01-02 15:04:05.000",
 	})
 
 	extractor, _ := umd.New(nil).
-		FindExtractor("https://coomer.su/onlyfans/user/corinnakopf")
+		FindExtractor("https://www.reddit.com/user/atomicbrunette18/")
 
-	resp := extractor.QueryMedia(100, nil, true)
+	resp, stop := extractor.QueryMedia(99_999, nil, true)
+
+	go func() {
+		time.Sleep(5 * time.Second)
+		stop()
+	}()
+
 	if err := queryUpdates(resp); err != nil {
 		log.Error(err)
 	}
@@ -40,7 +46,10 @@ func queryUpdates(resp *umd.Response) error {
 			}
 
 		case <-resp.Done:
-			log.Info("Size: ", len(resp.Media))
+			size := len(resp.Media)
+			if size != oldValue {
+				log.Info("Size: ", size)
+			}
 			return resp.Error()
 		}
 	}

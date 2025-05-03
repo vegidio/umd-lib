@@ -16,7 +16,7 @@ func TestReddit_QuerySubreddit(t *testing.T) {
 	const NumberOfPosts = 50
 
 	extractor, _ := umd.New(nil).FindExtractor("https://www.reddit.com/r/PristineGirls/")
-	resp := extractor.QueryMedia(NumberOfPosts, nil, true)
+	resp, _ := extractor.QueryMedia(NumberOfPosts, nil, true)
 	err := resp.Error()
 
 	assert.NoError(t, err)
@@ -33,7 +33,7 @@ func TestReddit_QuerySubmissions(t *testing.T) {
 	const NumberOfPosts = 50
 
 	extractor, _ := umd.New(nil).FindExtractor("https://www.reddit.com/user/atomicbrunette18/")
-	resp := extractor.QueryMedia(NumberOfPosts, nil, true)
+	resp, _ := extractor.QueryMedia(NumberOfPosts, nil, true)
 	err := resp.Error()
 
 	assert.NoError(t, err)
@@ -48,7 +48,7 @@ func TestReddit_QuerySingleSubmission(t *testing.T) {
 	}
 
 	extractor, _ := umd.New(nil).FindExtractor("https://www.reddit.com/r/needysluts/comments/1aenk3e/if_im_wearing_this_for_our_date_you_have_bo/")
-	resp := extractor.QueryMedia(99999, nil, true)
+	resp, _ := extractor.QueryMedia(99999, nil, true)
 	err := resp.Error()
 
 	assert.NoError(t, err)

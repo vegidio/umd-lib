@@ -14,7 +14,7 @@ func TestImaglr_DownloadVideo(t *testing.T) {
 	_ = os.Remove(FilePath)
 
 	extractor, _ := umd.New(nil).FindExtractor("https://imaglr.com/post/5778297")
-	resp := extractor.QueryMedia(99999, nil, true)
+	resp, _ := extractor.QueryMedia(99999, nil, true)
 	<-resp.Done
 
 	media := resp.Media[0]

@@ -36,7 +36,7 @@ func (External) ExpandMedia(media []model.Media, ignoreHost string, metadata *mo
 					return
 				}
 
-				resp := extractor.QueryMedia(1, make([]string, 0), false)
+				resp, _ := extractor.QueryMedia(1, make([]string, 0), false)
 				if resp.Error() != nil {
 					mu.Lock()
 					result = append(result, current)

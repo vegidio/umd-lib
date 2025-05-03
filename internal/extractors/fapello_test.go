@@ -10,7 +10,7 @@ func TestFapello_QueryPost(t *testing.T) {
 	const NumberOfPosts = 1
 
 	extractor, _ := umd.New(nil).FindExtractor("https://fapello.com/eva-padlock/1552/")
-	resp := extractor.QueryMedia(99999, nil, true)
+	resp, _ := extractor.QueryMedia(99999, nil, true)
 	err := resp.Error()
 
 	assert.NoError(t, err)
@@ -23,7 +23,7 @@ func TestFapello_QueryModel(t *testing.T) {
 	const NumberOfPosts = 91
 
 	extractor, _ := umd.New(nil).FindExtractor("https://fapello.com/darja-sobakinskaja/")
-	resp := extractor.QueryMedia(99999, nil, true)
+	resp, _ := extractor.QueryMedia(99999, nil, true)
 	err := resp.Error()
 
 	assert.NoError(t, err)

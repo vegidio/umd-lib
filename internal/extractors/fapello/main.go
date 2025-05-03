@@ -1,6 +1,7 @@
 package fapello
 
 import (
+	"context"
 	"fmt"
 	"github.com/vegidio/umd-lib/internal/model"
 	"github.com/vegidio/umd-lib/internal/utils"
@@ -57,8 +58,9 @@ func (f *Fapello) SourceType() (model.SourceType, error) {
 	return source, nil
 }
 
-func (f *Fapello) QueryMedia(limit int, extensions []string, deep bool) *model.Response {
+func (f *Fapello) QueryMedia(limit int, extensions []string, deep bool) (*model.Response, func()) {
 	var err error
+	ctx, stop := context.WithCancel(context.Background())
 
 	if f.responseMetadata == nil {
 		f.responseMetadata = make(model.Metadata)
@@ -83,21 +85,33 @@ func (f *Fapello) QueryMedia(limit int, extensions []string, deep bool) *model.R
 			}
 		}
 
-		for result := range f.fetchMedia(f.source, limit, extensions, deep) {
-			if result.Err != nil {
-				response.Done <- result.Err
-				return
-			}
+		mediaCh := f.fetchMedia(f.source, limit, extensions, deep)
 
-			// Limiting the number of results
-			if utils.MergeMedia(&response.Media, result.Data) >= limit {
-				response.Media = response.Media[:limit]
-				break
+		for {
+			select {
+			case <-ctx.Done():
+				return
+
+			case result, ok := <-mediaCh:
+				if !ok {
+					return
+				}
+
+				if result.Err != nil {
+					response.Done <- result.Err
+					return
+				}
+
+				// Limiting the number of results
+				if utils.MergeMedia(&response.Media, result.Data) >= limit {
+					response.Media = response.Media[:limit]
+					return
+				}
 			}
 		}
 	}()
 
-	return response
+	return response, stop
 }
 
 // Compile-time assertion to ensure the extractor implements the Extractor interface

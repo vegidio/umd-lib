@@ -1,6 +1,7 @@
 package coomer
 
 import (
+	"context"
 	"fmt"
 	"github.com/vegidio/umd-lib/internal/model"
 	"github.com/vegidio/umd-lib/internal/utils"
@@ -81,8 +82,9 @@ func (c *Coomer) SourceType() (model.SourceType, error) {
 	return source, nil
 }
 
-func (c *Coomer) QueryMedia(limit int, extensions []string, deep bool) *model.Response {
+func (c *Coomer) QueryMedia(limit int, extensions []string, deep bool) (*model.Response, func()) {
 	var err error
+	ctx, stop := context.WithCancel(context.Background())
 
 	if c.responseMetadata == nil {
 		c.responseMetadata = make(model.Metadata)
@@ -107,21 +109,33 @@ func (c *Coomer) QueryMedia(limit int, extensions []string, deep bool) *model.Re
 			}
 		}
 
-		for result := range c.fetchMedia(c.source, extensions, deep) {
-			if result.Err != nil {
-				response.Done <- result.Err
-				return
-			}
+		mediaCh := c.fetchMedia(c.source, extensions, deep)
 
-			// Limiting the number of results
-			if utils.MergeMedia(&response.Media, result.Data) >= limit {
-				response.Media = response.Media[:limit]
-				break
+		for {
+			select {
+			case <-ctx.Done():
+				return
+
+			case result, ok := <-mediaCh:
+				if !ok {
+					return
+				}
+
+				if result.Err != nil {
+					response.Done <- result.Err
+					return
+				}
+
+				// Limiting the number of results
+				if utils.MergeMedia(&response.Media, result.Data) >= limit {
+					response.Media = response.Media[:limit]
+					return
+				}
 			}
 		}
 	}()
 
-	return response
+	return response, stop
 }
 
 // Compile-time assertion to ensure the extractor implements the Extractor interface

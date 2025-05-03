@@ -1,6 +1,7 @@
 package imaglr
 
 import (
+	"context"
 	"fmt"
 	"github.com/samber/lo"
 	"github.com/vegidio/umd-lib/internal/model"
@@ -52,8 +53,9 @@ func (i *Imaglr) SourceType() (model.SourceType, error) {
 	return source, nil
 }
 
-func (i *Imaglr) QueryMedia(limit int, extensions []string, deep bool) *model.Response {
+func (i *Imaglr) QueryMedia(limit int, extensions []string, deep bool) (*model.Response, func()) {
 	var err error
+	ctx, stop := context.WithCancel(context.Background())
 
 	if i.responseMetadata == nil {
 		i.responseMetadata = make(model.Metadata)
@@ -78,21 +80,33 @@ func (i *Imaglr) QueryMedia(limit int, extensions []string, deep bool) *model.Re
 			}
 		}
 
-		for result := range i.fetchMedia(i.source, limit, extensions, deep) {
-			if result.Err != nil {
-				response.Done <- result.Err
-				return
-			}
+		mediaCh := i.fetchMedia(i.source, limit, extensions, deep)
 
-			// Limiting the number of results
-			if utils.MergeMedia(&response.Media, result.Data) >= limit {
-				response.Media = response.Media[:limit]
-				break
+		for {
+			select {
+			case <-ctx.Done():
+				return
+
+			case result, ok := <-mediaCh:
+				if !ok {
+					return
+				}
+
+				if result.Err != nil {
+					response.Done <- result.Err
+					return
+				}
+
+				// Limiting the number of results
+				if utils.MergeMedia(&response.Media, result.Data) >= limit {
+					response.Media = response.Media[:limit]
+					return
+				}
 			}
 		}
 	}()
 
-	return response
+	return response, stop
 }
 
 // Compile-time assertion to ensure the extractor implements the Extractor interface
