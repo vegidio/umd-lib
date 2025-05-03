@@ -199,6 +199,7 @@ func (f Fetch) downloadWithRetries(response *Response, offset int64, file *os.Fi
 		if resp.StatusCode == http.StatusRequestedRangeNotSatisfiable {
 			response.StatusCode = resp.StatusCode
 			response.Size = offset
+			response.Progress = float64(offset) / float64(response.Size)
 			break
 		}
 
