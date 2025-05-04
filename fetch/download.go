@@ -204,7 +204,7 @@ func (f Fetch) downloadWithRetries(response *Response, offset int64, file *os.Fi
 		}
 
 		// Only accept 2xx
-		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		if resp.StatusCode != 404 && (resp.StatusCode < 200 || resp.StatusCode >= 300) {
 			response.err = fmt.Errorf("unexpected status: %d", resp.StatusCode)
 			continue
 		}
@@ -243,6 +243,11 @@ func (f Fetch) downloadWithRetries(response *Response, offset int64, file *os.Fi
 		}
 
 		// Success
+		if response.Size == -1 {
+			response.Size = response.Downloaded
+			response.Progress = 1
+		}
+
 		response.StatusCode = resp.StatusCode
 		response.err = nil
 		break
