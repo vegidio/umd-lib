@@ -25,8 +25,9 @@ type Response struct {
 	Size       int64
 	Downloaded int64
 	Progress   float64
-	Done       chan struct{}
-	err        error
+	Done       chan struct{} `json:"-"`
+	
+	err error
 }
 
 // Error waits for the download to complete and returns any error that occurred during the process.
