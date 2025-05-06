@@ -1,6 +1,7 @@
 package fetch
 
 import (
+	"context"
 	"fmt"
 	log "github.com/sirupsen/logrus"
 	"io"
@@ -48,9 +49,16 @@ func (f Fetch) NewRequest(url string, filePath string) (*Request, error) {
 // Returns:
 //   - A Response object that contains the status and details of the download process.
 func (f Fetch) DownloadFile(request *Request) *Response {
+	ctx, cancel := context.WithCancel(context.Background())
+
+	// Tie the http.Request to the context.
+	// It means that if the context is cancelled the request will be cancelled too.
+	request.httpReq = request.httpReq.WithContext(ctx)
+
 	response := &Response{
 		Request: request,
 		Done:    make(chan struct{}, 1),
+		cancel:  cancel,
 	}
 
 	go func() {
@@ -89,7 +97,7 @@ func (f Fetch) DownloadFile(request *Request) *Response {
 		}
 
 		// Perform the download (with resume & retries)
-		f.downloadWithRetries(response, offset, file, pw)
+		f.downloadWithRetries(response, offset, file, pw, ctx)
 	}()
 
 	return response
@@ -139,11 +147,25 @@ func (f Fetch) DownloadFiles(requests []*Request, parallel int) <-chan *Response
 
 // region - Private functions
 
-func (f Fetch) downloadWithRetries(response *Response, offset int64, file *os.File, writer io.Writer) {
+func (f Fetch) downloadWithRetries(
+	response *Response,
+	offset int64,
+	file *os.File,
+	writer io.Writer,
+	ctx context.Context,
+) {
 	var resp *http.Response
 	var err error
 
 	for attempt := 0; attempt <= f.retries; attempt++ {
+		// Before each attempt, see if we've been cancelled
+		select {
+		case <-ctx.Done():
+			response.err = ctx.Err()
+			return
+		default:
+		}
+
 		if attempt > 0 {
 			backoff := time.Duration(fibonacci(attempt+1)) * time.Second
 
@@ -228,6 +250,11 @@ func (f Fetch) downloadWithRetries(response *Response, offset int64, file *os.Fi
 		// Actually copy data
 		_, err = io.Copy(writer, resp.Body)
 		if err != nil {
+			if ctx.Err() != nil {
+				response.err = ctx.Err()
+				break
+			}
+
 			// figure out how many bytes actually made it to disk
 			newOffset, seekErr := file.Seek(0, io.SeekEnd)
 			if seekErr != nil {

@@ -1,6 +1,7 @@
 package fetch
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -26,8 +27,9 @@ type Response struct {
 	Downloaded int64
 	Progress   float64
 	Done       chan struct{} `json:"-"`
-	
-	err error
+
+	cancel context.CancelFunc
+	err    error
 }
 
 // Error waits for the download to complete and returns any error that occurred during the process.
@@ -44,6 +46,11 @@ func (r *Response) IsComplete() bool {
 	default:
 		return false
 	}
+}
+
+// Cancel stops the download process.
+func (r *Response) Cancel() {
+	r.cancel()
 }
 
 // Bytes reads the file specified in the Request's FilePath and returns its content as a byte slice.
