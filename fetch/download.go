@@ -52,7 +52,7 @@ func (f Fetch) DownloadFile(request *Request) *Response {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	// Tie the http.Request to the context.
-	// It means that if the context is cancelled the request will be cancelled too.
+	// It means that if the context is canceled, the request will be canceled too.
 	request.httpReq = request.httpReq.WithContext(ctx)
 
 	response := &Response{
@@ -64,13 +64,13 @@ func (f Fetch) DownloadFile(request *Request) *Response {
 	go func() {
 		defer close(response.Done)
 
-		// How many bytes are already on disk?
+		// How many bytes are already on the disk?
 		var offset int64
 		if info, err := os.Stat(request.FilePath); err == nil {
 			offset = info.Size()
 		}
 
-		// Open (or create) file for appending
+		// Open (or create) a file for appending
 		file, err := os.OpenFile(request.FilePath, os.O_CREATE|os.O_WRONLY, 0o644)
 		if err != nil {
 			response.err = fmt.Errorf("could not open file: %w", err)
@@ -158,7 +158,7 @@ func (f Fetch) downloadWithRetries(
 	var err error
 
 	for attempt := 0; attempt <= f.retries; attempt++ {
-		// Before each attempt, see if we've been cancelled
+		// Before each attempt, see if we've been canceled
 		select {
 		case <-ctx.Done():
 			response.err = ctx.Err()

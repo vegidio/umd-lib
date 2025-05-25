@@ -20,37 +20,17 @@ func main() {
 	resp, stop := extractor.QueryMedia(99_999, nil, true)
 
 	go func() {
-		time.Sleep(5 * time.Second)
+		time.Sleep(10 * time.Second)
 		stop()
 	}()
 
-	if err := queryUpdates(resp); err != nil {
+	err := resp.Track(func(queried, total int) {
+		log.Info("Queried: ", queried, " - Size: ", total)
+	})
+
+	if err != nil {
 		log.Error(err)
 	}
 
 	log.Info("Done")
-}
-
-func queryUpdates(resp *umd.Response) error {
-	ticker := time.NewTicker(100 * time.Millisecond)
-	defer ticker.Stop()
-	oldValue := -1
-
-	for {
-		select {
-		case <-ticker.C:
-			size := len(resp.Media)
-			if size != oldValue {
-				oldValue = size
-				log.Info("Size: ", size)
-			}
-
-		case <-resp.Done:
-			size := len(resp.Media)
-			if size != oldValue {
-				log.Info("Size: ", size)
-			}
-			return resp.Error()
-		}
-	}
 }

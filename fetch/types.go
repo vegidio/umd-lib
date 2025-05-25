@@ -53,7 +53,7 @@ func (r *Response) Cancel() {
 	r.cancel()
 }
 
-// Bytes reads the file specified in the Request's FilePath and returns its content as a byte slice.
+// Bytes read the file specified in the Request's FilePath and return its content as a byte slice.
 // It returns an error if the file cannot be read.
 func (r *Response) Bytes() ([]byte, error) {
 	data, err := os.ReadFile(r.Request.FilePath)
