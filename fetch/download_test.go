@@ -78,7 +78,7 @@ func TestFetch_DownloadFiles(t *testing.T) {
 		return r
 	})
 
-	result := fetch.DownloadFiles(requests, 1)
+	result, _ := fetch.DownloadFiles(requests, 1)
 
 	for resp := range result {
 		assert.NoError(t, resp.Error())

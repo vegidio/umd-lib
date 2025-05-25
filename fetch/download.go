@@ -111,38 +111,72 @@ func (f Fetch) DownloadFile(request *Request) *Response {
 //
 // Returns:
 //   - A channel of *Response objects, where each response corresponds to a file download.
-func (f Fetch) DownloadFiles(requests []*Request, parallel int) <-chan *Response {
+//   - A function that can be called to cancel all downloads.
+func (f Fetch) DownloadFiles(requests []*Request, parallel int) (<-chan *Response, func()) {
 	result := make(chan *Response)
+	done := make(chan struct{})
+
+	var (
+		wg      sync.WaitGroup
+		sem     = make(chan struct{}, parallel)
+		mu      sync.Mutex
+		cancels []func()
+	)
+
+	// cancelAll cancels all ongoing downloads
+	cancelAll := func() {
+		select {
+		case <-done:
+			// already canceled
+		default:
+			close(done)
+		}
+
+		mu.Lock()
+		defer mu.Unlock()
+		for _, cancelFn := range cancels {
+			cancelFn()
+		}
+	}
 
 	go func() {
 		defer close(result)
 
-		var wg sync.WaitGroup
-		sem := make(chan struct{}, parallel)
-
-		for _, request := range requests {
+		for _, req := range requests {
 			wg.Add(1)
 
 			go func(r *Request) {
-				defer func() {
-					<-sem
-					wg.Done()
-				}()
+				defer wg.Done()
 
-				sem <- struct{}{}
-				resp := f.DownloadFile(request)
+				// Either grab a slot or exit if canceled
+				select {
+				case sem <- struct{}{}:
+					// slot acquired
+				case <-done:
+					return
+				}
+
+				defer func() { <-sem }()
+
+				// Start the download
+				resp := f.DownloadFile(r)
+
+				// Capture the Cancel() function
+				mu.Lock()
+				cancels = append(cancels, resp.cancel)
+				mu.Unlock()
+
 				result <- resp
 
 				// Waiting for the download the complete before continuing
 				_ = resp.Error()
-			}(request)
+			}(req)
 		}
 
 		wg.Wait()
-		close(sem)
 	}()
 
-	return result
+	return result, cancelAll
 }
 
 // region - Private functions
