@@ -2,7 +2,6 @@ package reddit
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"github.com/vegidio/umd-lib/internal/model"
 	"github.com/vegidio/umd-lib/internal/utils"
@@ -95,7 +94,7 @@ func (r *Reddit) QueryMedia(limit int, extensions []string, deep bool) (*model.R
 			}
 		}
 
-		mediaCh := r.fetchMedia(r.source, limit, extensions, deep)
+		mediaCh := r.fetchMedia(r.source, extensions, deep)
 
 		for {
 			select {
@@ -131,7 +130,6 @@ var _ model.Extractor = (*Reddit)(nil)
 
 func (r *Reddit) fetchMedia(
 	source model.SourceType,
-	limit int,
 	extensions []string,
 	deep bool,
 ) <-chan model.Result[[]model.Media] {
@@ -139,99 +137,48 @@ func (r *Reddit) fetchMedia(
 
 	go func() {
 		defer close(out)
-		after := ""
+		var children <-chan model.Result[ChildData]
 
-		for {
-			var submission *Submission
-			var err error
+		switch s := source.(type) {
+		case SourceSubmission:
+			children = getSubmission(s.Id)
+		case SourceUser:
+			children = getUserSubmissions(s.name)
+		case SourceSubreddit:
+			children = getSubredditSubmissions(s.name)
+		}
 
-			switch s := source.(type) {
-			case SourceSubmission:
-				submission, err = getSubmission(s.Id)
-			case SourceUser:
-				submission, err = getUserSubmissions(s.name, after, limit)
-			case SourceSubreddit:
-				submission, err = getSubredditSubmissions(s.name, after, limit)
-			}
-
-			if err != nil {
-				out <- model.Result[[]model.Media]{Err: err}
+		for child := range children {
+			if child.Err != nil {
+				out <- model.Result[[]model.Media]{Err: child.Err}
 				return
 			}
 
-			newMedia := submissionsToMedia(submission.Data.Children, source.Type(), source.Name())
+			media := r.childToMedia(child.Data, source.Type(), source.Name())
 			if deep {
-				newMedia = r.external.ExpandMedia(newMedia, Host, &r.responseMetadata, 5)
+				media = r.external.ExpandMedia(media, Host, &r.responseMetadata, 5)
 			}
 
-			after = submission.Data.After
-			out <- model.Result[[]model.Media]{Data: newMedia}
-
-			if len(newMedia) == 0 || after == "" {
-				break
-			}
+			out <- model.Result[[]model.Media]{Data: media}
 		}
 	}()
 
 	return out
 }
 
-// endregion
-
-// region - Private functions
-
-func submissionsToMedia(submissions []Child, sourceName string, name string) []model.Media {
-	media := make([]model.Media, 0)
-
-	for _, submission := range submissions {
-		if submission.Data.IsGallery {
-			newMedia := getGalleryMedia(submission, sourceName, name)
-			media = append(media, newMedia...)
-		} else {
-			url := submission.Data.SecureMedia.RedditVideo.FallbackUrl
-			if url == "" {
-				url = submission.Data.Url
-			}
-
-			newMedia := model.NewMedia(url, model.Reddit, map[string]interface{}{
-				"source":  strings.ToLower(sourceName),
-				"name":    name,
-				"created": submission.Data.Created.Time,
-			})
-
-			media = append(media, newMedia)
-		}
+func (r *Reddit) childToMedia(child ChildData, sourceName string, name string) []model.Media {
+	url := child.SecureMedia.RedditVideo.FallbackUrl
+	if url == "" {
+		url = child.Url
 	}
 
-	return media
-}
+	newMedia := model.NewMedia(url, model.Reddit, map[string]interface{}{
+		"source":  strings.ToLower(sourceName),
+		"name":    name,
+		"created": child.Created.Time,
+	})
 
-func getGalleryMedia(submission Child, sourceName string, name string) []model.Media {
-	media := make([]model.Media, 0)
-
-	for _, value := range submission.Data.MediaMetadata {
-		var metadata MediaMetadata
-		jsonData, _ := json.Marshal(value)
-		json.Unmarshal(jsonData, &metadata)
-
-		if metadata.Status == "valid" {
-			url := metadata.S.Image
-			if url == "" {
-				url = metadata.S.Gif
-			}
-
-			newMedia := model.NewMedia(url, model.Reddit, map[string]interface{}{
-				"source":  strings.ToLower(sourceName),
-				"name":    name,
-				"created": submission.Data.Created.Time,
-			})
-
-			newMedia.Url = url
-			media = append(media, newMedia)
-		}
-	}
-
-	return media
+	return []model.Media{newMedia}
 }
 
 // endregion

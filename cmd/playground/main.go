@@ -3,7 +3,6 @@ package main
 import (
 	log "github.com/sirupsen/logrus"
 	"github.com/vegidio/umd-lib"
-	"time"
 )
 
 func main() {
@@ -17,12 +16,7 @@ func main() {
 	extractor, _ := umd.New(nil).
 		FindExtractor("https://www.reddit.com/user/atomicbrunette18/")
 
-	resp, stop := extractor.QueryMedia(99_999, nil, true)
-
-	go func() {
-		time.Sleep(10 * time.Second)
-		stop()
-	}()
+	resp, _ := extractor.QueryMedia(99_999, nil, true)
 
 	err := resp.Track(func(queried, total int) {
 		log.Info("Queried: ", queried, " - Size: ", total)

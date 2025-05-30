@@ -1,84 +1,153 @@
 package reddit
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/vegidio/umd-lib/fetch"
+	"github.com/vegidio/umd-lib/internal/model"
 )
 
 const BaseUrl = "https://www.reddit.com/"
 
 var f = fetch.New(nil, 10)
 
-// getSubmission retrieves a list of submissions for a given Reddit post ID.
+// getSubmission fetches and processes submission data for a given Reddit post ID.
 //
 // Example: https://www.reddit.com/comments/1bxsmnr.json?raw_json=1, where <1bxsmnr> is the ID.
 //
 // # Parameters:
-//   - id: The ID of the Reddit post.
+//   - id: string - The unique identifier of the Reddit post to fetch
 //
 // # Returns:
-//   - A slice of Submission structs containing the details of the submissions.
-func getSubmission(id string) (*Submission, error) {
-	submissions := make([]Submission, 0)
-	url := fmt.Sprintf(BaseUrl+"comments/%s.json?raw_json=1", id)
-	resp, err := f.GetResult(url, nil, &submissions)
+//   - <-chan model.Result[ChildData] - A receive-only channel that streams Reddit post data or errors
+func getSubmission(id string) <-chan model.Result[ChildData] {
+	out := make(chan model.Result[ChildData])
 
-	if err != nil {
-		return nil, err
-	} else if resp.IsError() {
-		return nil, fmt.Errorf("error fetching post id '%s' submissions: %s", id, resp.Status())
-	}
+	go func() {
+		defer close(out)
 
-	return &submissions[0], nil
+		submissions := make([]Submission, 0)
+		url := fmt.Sprintf(BaseUrl+"comments/%s.json?raw_json=1", id)
+		resp, err := f.GetResult(url, nil, &submissions)
+
+		if err != nil {
+			out <- model.Result[ChildData]{Err: err}
+			return
+		} else if resp.IsError() {
+			out <- model.Result[ChildData]{Err: fmt.Errorf("error fetching post id '%s' submissions: %s", id, resp.Status())}
+			return
+		}
+
+		submission := submissions[0]
+		for _, child := range submission.Data.Children {
+			if child.Data.IsGallery {
+				children := getGalleryData(child.Data)
+
+				for _, gallery := range children {
+					out <- model.Result[ChildData]{Data: gallery}
+				}
+			} else {
+				out <- model.Result[ChildData]{Data: child.Data}
+			}
+		}
+	}()
+
+	return out
 }
 
-// getUserSubmissions retrieves a list of submissions for a given Reddit user.
+// getUserSubmissions retrieves a stream of user submissions as a channel of model.Result[ChildData]. The submissions
+// are fetched using the specified user's name.
 //
 // Example: https://www.reddit.com/user/atomicbrunette18/submitted.json?sort=new&raw_json=1&after=&limit=100, where
 // <atomicbrunette18> is the username.
 //
 // # Parameters:
-//   - user: The username of the Reddit user.
-//   - after: The ID of the last submission to start after (for pagination).
-//   - limit: The maximum number of submissions to retrieve.
+//   - user: string - The username whose submissions to fetch
 //
 // # Returns:
-//   - A Submission struct containing the details of the submissions.
-func getUserSubmissions(user string, after string, limit int) (*Submission, error) {
-	var submission *Submission
-	url := fmt.Sprintf(BaseUrl+"user/%s/submitted.json?sort=new&raw_json=1&after=%s&limit=%d", user, after, limit)
-	resp, err := f.GetResult(url, nil, &submission)
-
-	if err != nil {
-		return nil, err
-	} else if resp.IsError() {
-		return nil, fmt.Errorf("error fetching user '%s' submissions: %s", user, resp.Status())
-	}
-
-	return submission, nil
+//   - <-chan model.Result[ChildData] - A receive-only channel that streams submission data or errors
+func getUserSubmissions(user string) <-chan model.Result[ChildData] {
+	urlFmt := BaseUrl + "user/%s/submitted.json?sort=new&raw_json=1&after=%s&limit=%d"
+	return streamSubmissions(urlFmt, user)
 }
 
-// getSubredditSubmissions retrieves a list of submissions for a given subreddit.
+// getSubredditSubmissions retrieves a stream of subreddit submissions as a channel of model.Result[ChildData]. The
+// submissions are fetched using the specified subreddit's name.
 //
 // Example: https://www.reddit.com/r/nsfw/hot.json?raw_json=1&after=&limit=100, where <nsfw> is the subreddit name.
 //
 // # Parameters:
-//   - subreddit: The name of the subreddit.
-//   - after: The ID of the last submission to start after (for pagination).
-//   - limit: The maximum number of submissions to retrieve.
+//   - subreddit: string - The subreddit whose submissions to fetch.
 //
 // # Returns:
-//   - A Submission struct containing the details of the submissions.
-func getSubredditSubmissions(subreddit string, after string, limit int) (*Submission, error) {
-	var submission *Submission
-	url := fmt.Sprintf(BaseUrl+"r/%s/hot.json?raw_json=1&after=%s&limit=%d", subreddit, after, limit)
-	resp, err := f.GetResult(url, nil, &submission)
+//   - <-chan model.Result[ChildData] - A receive-only channel that streams submission data or errors.
+func getSubredditSubmissions(subreddit string) <-chan model.Result[ChildData] {
+	urlFmt := BaseUrl + "r/%s/hot.json?raw_json=1&after=%s&limit=%d"
+	return streamSubmissions(urlFmt, subreddit)
+}
 
-	if err != nil {
-		return nil, err
-	} else if resp.IsError() {
-		return nil, fmt.Errorf("error fetching subreddit '%s' submissions: %s", subreddit, resp.Status())
+func streamSubmissions(urlFmt string, what string) <-chan model.Result[ChildData] {
+	out := make(chan model.Result[ChildData])
+
+	go func() {
+		defer close(out)
+		after := ""
+
+		for {
+			var submission *Submission
+			url := fmt.Sprintf(urlFmt, what, after, 100)
+			resp, err := f.GetResult(url, nil, &submission)
+
+			if err != nil {
+				out <- model.Result[ChildData]{Err: err}
+				return
+			} else if resp.IsError() {
+				out <- model.Result[ChildData]{Err: fmt.Errorf("error fetching %s submissions: %s", what, resp.Status())}
+				return
+			}
+
+			for _, child := range submission.Data.Children {
+				if child.Data.IsGallery {
+					for _, galleryItem := range getGalleryData(child.Data) {
+						out <- model.Result[ChildData]{Data: galleryItem}
+					}
+				} else {
+					out <- model.Result[ChildData]{Data: child.Data}
+				}
+			}
+
+			after = submission.Data.After
+			if after == "" {
+				return
+			}
+		}
+	}()
+	return out
+}
+
+func getGalleryData(child ChildData) []ChildData {
+	children := make([]ChildData, 0)
+
+	for _, value := range child.MediaMetadata {
+		var metadata MediaMetadata
+		jsonData, _ := json.Marshal(value)
+		json.Unmarshal(jsonData, &metadata)
+
+		if metadata.Status == "valid" {
+			url := metadata.S.Image
+			if url == "" {
+				url = metadata.S.Gif
+			}
+
+			newChild := ChildData{
+				Author:  child.Author,
+				Url:     url,
+				Created: child.Created,
+			}
+
+			children = append(children, newChild)
+		}
 	}
 
-	return submission, nil
+	return children
 }
