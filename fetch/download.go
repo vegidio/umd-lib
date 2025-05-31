@@ -226,8 +226,6 @@ func (f Fetch) downloadWithRetries(
 			continue
 		}
 
-		defer resp.Body.Close()
-
 		// Fallback if server doesn’t support Range
 		if isRangeReq && resp.StatusCode == http.StatusOK {
 			// Truncate file and reset offset
@@ -246,6 +244,7 @@ func (f Fetch) downloadWithRetries(
 			}
 
 			attempt-- // retry same attempt count with fresh download
+			resp.Body.Close()
 			continue
 		}
 
@@ -256,12 +255,16 @@ func (f Fetch) downloadWithRetries(
 			response.StatusCode = resp.StatusCode
 			response.Size = offset
 			response.Progress = float64(offset) / float64(response.Size)
+
+			resp.Body.Close()
 			break
 		}
 
-		// Only accept 2xx
-		if resp.StatusCode != 404 && (resp.StatusCode < 200 || resp.StatusCode >= 300) {
+		// If we get an error (anything that is not 2xx), then we abort this loop and go to the next attempt.
+		// We don't do that for HTTP 404 and 410, because those are cases where we know the file is not there.
+		if resp.StatusCode != 404 && resp.StatusCode != 410 && (resp.StatusCode < 200 || resp.StatusCode >= 300) {
 			response.err = fmt.Errorf("unexpected status: %d", resp.StatusCode)
+			resp.Body.Close()
 			continue
 		}
 
@@ -286,13 +289,15 @@ func (f Fetch) downloadWithRetries(
 		if err != nil {
 			if ctx.Err() != nil {
 				response.err = ctx.Err()
+				resp.Body.Close()
 				break
 			}
 
-			// figure out how many bytes actually made it to disk
+			// figure out how many bytes actually made it to the disk
 			newOffset, seekErr := file.Seek(0, io.SeekEnd)
 			if seekErr != nil {
 				response.err = fmt.Errorf("seek after partial download failed: %w", seekErr)
+				resp.Body.Close()
 				break
 			}
 
@@ -300,6 +305,7 @@ func (f Fetch) downloadWithRetries(
 			offset = newOffset
 			response.err = fmt.Errorf("download interrupted (wrote %d bytes), will resume: %w",
 				newOffset-startOffset, err)
+			resp.Body.Close()
 			continue
 		}
 
@@ -311,6 +317,7 @@ func (f Fetch) downloadWithRetries(
 
 		response.StatusCode = resp.StatusCode
 		response.err = nil
+		resp.Body.Close()
 		break
 	}
 }

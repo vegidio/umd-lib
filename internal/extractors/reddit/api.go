@@ -77,7 +77,7 @@ func getUserSubmissions(user string) <-chan model.Result[ChildData] {
 // Example: https://www.reddit.com/r/nsfw/hot.json?raw_json=1&after=&limit=100, where <nsfw> is the subreddit name.
 //
 // # Parameters:
-//   - subreddit: string - The subreddit whose submissions to fetch.
+//   - subreddit: string - The subreddit whose submissions are to fetch.
 //
 // # Returns:
 //   - <-chan model.Result[ChildData] - A receive-only channel that streams submission data or errors.
