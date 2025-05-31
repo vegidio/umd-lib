@@ -3,6 +3,7 @@ package main
 import (
 	log "github.com/sirupsen/logrus"
 	"github.com/vegidio/umd-lib"
+	"github.com/vegidio/umd-lib/fetch"
 )
 
 func main() {
@@ -13,8 +14,12 @@ func main() {
 		TimestampFormat: "2006-01-02 15:04:05.000",
 	})
 
+	downloadFiles()
+}
+
+func query() {
 	extractor, _ := umd.New(nil).
-		FindExtractor("https://www.reddit.com/user/atomicbrunette18/")
+		FindExtractor("https://www.redgifs.com/watch/suddenthinjohndory")
 
 	resp, _ := extractor.QueryMedia(99_999, nil, true)
 
@@ -24,6 +29,36 @@ func main() {
 
 	if err != nil {
 		log.Error(err)
+	}
+
+	log.Info("Done")
+}
+
+func download() {
+	f := fetch.New(nil, 10)
+	request, _ := f.NewRequest("https://www.redgifs.com/watch/suddenthinjohndory", "test.mp4")
+	resp := f.DownloadFile(request)
+
+	err := resp.Track(func(completed, total int64, progress float64) {
+		log.Info("Progress: ", progress)
+	})
+
+	if err != nil {
+		log.Error(err)
+	}
+
+	log.Info("Done")
+}
+
+func downloadFiles() {
+	f := fetch.New(nil, 10)
+	request, _ := f.NewRequest("https://www.redgifs.com/watch/suddenthinjohndory", "test.mp4")
+	requests := []*fetch.Request{request}
+
+	result, _ := f.DownloadFiles(requests, 5)
+
+	for file := range result {
+		log.Info("Downloading ", file.Request.Url)
 	}
 
 	log.Info("Done")
