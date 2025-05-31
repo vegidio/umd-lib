@@ -45,7 +45,7 @@ func NewMedia(urlStr string, extractor ExtractorType, metadata map[string]interf
 	}
 
 	return Media{
-		Url:       cleanUrl,
+		Url:       urlStr,
 		Extension: extension,
 		Type:      getType(extension),
 		Extractor: extractor,
