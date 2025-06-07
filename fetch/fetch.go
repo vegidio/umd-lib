@@ -3,7 +3,6 @@ package fetch
 import (
 	"fmt"
 	"github.com/go-resty/resty/v2"
-	"github.com/go-rod/rod"
 	log "github.com/sirupsen/logrus"
 	"net/http"
 	"time"
@@ -55,7 +54,7 @@ func New(headers map[string]string, retries int) Fetch {
 					return false
 				},
 			),
-			
+
 		httpClient: newIdleTimeoutClient(30 * time.Second),
 
 		retries: retries,
@@ -132,59 +131,6 @@ func (f Fetch) GetResult(url string, headers map[string]string, result interface
 	}
 
 	return resp, nil
-}
-
-// GetHtml uses the browser to perform a GET request to the specified URL and returns the response body as a string.
-//
-// Parameters:
-//   - browser: the browser instance to use for the request.
-//   - url: the URL to send the GET request to.
-//   - element: the selector for the element to wait for before returning the response body.
-//
-// Returns the response body as a string and an error if the request fails.
-func (f Fetch) GetHtml(page *rod.Page, url string, element string) (string, error) {
-	var html string
-	var err error
-
-	for attempt := 1; attempt <= f.retries; attempt++ {
-		var el *rod.Element
-
-		// Navigate to the URL
-		err = page.Timeout(5 * time.Second).Navigate(url)
-		err = replaceError(err, fmt.Errorf("failed to navigate to URL"))
-
-		if err == nil {
-			el, err = page.Timeout(5 * time.Second).Element(element)
-			err = replaceError(err, fmt.Errorf("failed to get element"))
-		}
-
-		if err == nil {
-			err = el.Timeout(5 * time.Second).WaitVisible()
-			err = replaceError(err, fmt.Errorf("failed waiting for element to be visible"))
-		}
-
-		if err == nil {
-			html, err = page.Timeout(5 * time.Second).HTML()
-			err = replaceError(err, fmt.Errorf("failed to get page HTML"))
-		}
-
-		if err == nil {
-			break
-		} else {
-			sleep := time.Duration(fibonacci(attempt+1)) * time.Second
-
-			log.WithFields(log.Fields{
-				"attempt": attempt,
-				"element": element,
-				"error":   err,
-				"url":     url,
-			}).Warn("Error getting data; retrying in ", sleep)
-
-			time.Sleep(sleep)
-		}
-	}
-
-	return html, err
 }
 
 // region - Private functions

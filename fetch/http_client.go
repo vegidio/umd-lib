@@ -41,8 +41,5 @@ func newIdleTimeoutClient(idleTimeout time.Duration) *http.Client {
 		return &timeoutConn{Conn: rawConn, idle: idleTimeout}, nil
 	}
 
-	return &http.Client{
-		Transport: base,
-		// no top-level Timeout → we rely solely on our per-Read deadline
-	}
+	return &http.Client{Transport: base}
 }
