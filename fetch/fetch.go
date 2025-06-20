@@ -23,13 +23,21 @@ var userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (K
 // Parameters:
 //   - headers: a map of headers to be set on each request.
 //   - retries: the number of retry attempts for failed requests.
-func New(headers map[string]string, retries int) Fetch {
+func New(headers map[string]string, retries int) *Fetch {
 	logger := log.New()
 
 	f := resty.New()
-	f.SetHeader("User-Agent", userAgent)
+	f.SetHeader("User-Agent", headers["User-Agent"])
 
-	return Fetch{
+	if headers == nil {
+		headers = make(map[string]string)
+	}
+
+	if _, exists := headers["User-Agent"]; !exists {
+		headers["User-Agent"] = userAgent
+	}
+
+	return &Fetch{
 		restClient: f.
 			SetLogger(logger).
 			SetHeaders(headers).
@@ -56,8 +64,8 @@ func New(headers map[string]string, retries int) Fetch {
 			),
 
 		httpClient: newIdleTimeoutClient(30 * time.Second),
-
-		retries: retries,
+		headers:    headers,
+		retries:    retries,
 	}
 }
 
@@ -67,7 +75,7 @@ func New(headers map[string]string, retries int) Fetch {
 //   - url: the URL to send the GET request to.
 //
 // Returns the response body as a string and an error if the request fails.
-func (f Fetch) GetText(url string) (string, error) {
+func (f *Fetch) GetText(url string) (string, error) {
 	resp, err := f.restClient.R().
 		Get(url)
 
@@ -104,7 +112,7 @@ func (f Fetch) GetText(url string) (string, error) {
 // Returns:
 //   - *resty.Response: the response from the GET request.
 //   - error: an error if the request fails or the response indicates an error.
-func (f Fetch) GetResult(url string, headers map[string]string, result interface{}) (*resty.Response, error) {
+func (f *Fetch) GetResult(url string, headers map[string]string, result interface{}) (*resty.Response, error) {
 	resp, err := f.restClient.R().
 		SetHeaders(headers).
 		SetResult(result).
@@ -132,14 +140,3 @@ func (f Fetch) GetResult(url string, headers map[string]string, result interface
 
 	return resp, nil
 }
-
-// region - Private functions
-
-func replaceError(err error, fallback error) error {
-	if err != nil {
-		return fallback
-	}
-	return err
-}
-
-// endregion

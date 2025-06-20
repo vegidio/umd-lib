@@ -1,10 +1,12 @@
 package fetch
 
 import (
+	"bufio"
 	"fmt"
 	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/proto"
 	"github.com/samber/lo"
+	"os"
 	"strings"
 	"time"
 )
@@ -15,9 +17,9 @@ type Cookie struct {
 	Value string `json:"value"`
 }
 
-// GetCookies retrieves HTTP cookies from a given URL by navigating to the page using a headless browser.
+// GetBrowserCookies retrieves HTTP cookies from a given URL by navigating to the page using a headless browser.
 // It returns a slice of Cookie objects or an error if the process fails.
-func GetCookies(url string, element string) ([]Cookie, error) {
+func GetBrowserCookies(url string, element string) ([]Cookie, error) {
 	browser := rod.New().MustConnect()
 	defer browser.Close()
 
@@ -50,6 +52,54 @@ func GetCookies(url string, element string) ([]Cookie, error) {
 	return extractCookies(page)
 }
 
+func GetFileCookies(filePath string) ([]Cookie, error) {
+	cookies := make([]Cookie, 0)
+
+	f, err := os.Open(filePath)
+	if err != nil {
+		return nil, err
+	}
+
+	defer f.Close()
+
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		line := scanner.Text()
+
+		// Skip comments & blank lines
+		if len(line) == 0 || line[0] == '#' {
+			continue
+		}
+
+		// Spec says 7 TAB-separated fields
+		parts := strings.Split(line, "\t")
+		if len(parts) != 7 {
+			continue
+		}
+
+		name := parts[5]
+		value := parts[6]
+
+		cookies = append(cookies, Cookie{
+			Name:  name,
+			Value: value,
+		})
+	}
+
+	return cookies, nil
+}
+
+// CookiesToHeader converts a slice of Cookie objects into a single HTTP header string in the "key=value" format.
+func CookiesToHeader(cookies []Cookie) string {
+	parts := lo.Map(cookies, func(cookie Cookie, index int) string {
+		return fmt.Sprintf("%s=%s", cookie.Name, cookie.Value)
+	})
+
+	return strings.Join(parts, "; ")
+}
+
+// region - Private functions
+
 func extractCookies(page *rod.Page) ([]Cookie, error) {
 	rodCookies, err := page.Cookies(nil)
 	if err != nil {
@@ -64,11 +114,4 @@ func extractCookies(page *rod.Page) ([]Cookie, error) {
 	}), nil
 }
 
-// CookiesToHeader converts a slice of Cookie objects into a single HTTP header string in the "key=value" format.
-func CookiesToHeader(cookies []Cookie) string {
-	parts := lo.Map(cookies, func(cookie Cookie, index int) string {
-		return fmt.Sprintf("%s=%s", cookie.Name, cookie.Value)
-	})
-
-	return strings.Join(parts, "; ")
-}
+// endregion

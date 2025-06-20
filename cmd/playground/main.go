@@ -16,7 +16,7 @@ func main() {
 		TimestampFormat: "2006-01-02 15:04:05.000",
 	})
 
-	cookies()
+	fileCookies()
 }
 
 func query() {
@@ -50,7 +50,7 @@ func queryDownload() {
 		log.Error(err)
 	}
 
-	co, _ := fetch.GetCookies("https://coomer.su/onlyfans/user/belledelphine", "header.user-header")
+	co, _ := fetch.GetBrowserCookies("https://coomer.su/onlyfans/user/belledelphine", "header.user-header")
 	header := fetch.CookiesToHeader(co)
 	headers := map[string]string{
 		"Cookie": header,
@@ -102,8 +102,20 @@ func downloadFiles() {
 	log.Info("Done")
 }
 
-func cookies() {
-	co, err := fetch.GetCookies("https://coomer.su/onlyfans/user/belledelphine", "header.user-header")
+func browserCookies() {
+	co, err := fetch.GetBrowserCookies("https://coomer.su/onlyfans/user/belledelphine", "header.user-header")
+
+	if err != nil {
+		log.Error(err)
+		return
+	}
+
+	header := fetch.CookiesToHeader(co)
+	fmt.Println(header)
+}
+
+func fileCookies() {
+	co, err := fetch.GetFileCookies("/Users/vegidio/Desktop/cookies.txt")
 
 	if err != nil {
 		log.Error(err)

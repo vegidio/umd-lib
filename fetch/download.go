@@ -20,7 +20,7 @@ import (
 // Returns:
 //   - A Request object containing the URL and file path.
 //   - An error if the request creation fails.
-func (f Fetch) NewRequest(url string, filePath string) (*Request, error) {
+func (f *Fetch) NewRequest(url string, filePath string) (*Request, error) {
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
@@ -48,7 +48,7 @@ func (f Fetch) NewRequest(url string, filePath string) (*Request, error) {
 //
 // Returns:
 //   - A Response object that contains the status and details of the download process.
-func (f Fetch) DownloadFile(request *Request) *Response {
+func (f *Fetch) DownloadFile(request *Request) *Response {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	// Tie the http.Request to the context.
@@ -112,7 +112,7 @@ func (f Fetch) DownloadFile(request *Request) *Response {
 // Returns:
 //   - A channel of *Response objects, where each response corresponds to a file download.
 //   - A function that can be called to cancel all downloads.
-func (f Fetch) DownloadFiles(requests []*Request, parallel int) (<-chan *Response, func()) {
+func (f *Fetch) DownloadFiles(requests []*Request, parallel int) (<-chan *Response, func()) {
 	result := make(chan *Response)
 	done := make(chan struct{})
 
@@ -181,7 +181,7 @@ func (f Fetch) DownloadFiles(requests []*Request, parallel int) (<-chan *Respons
 
 // region - Private functions
 
-func (f Fetch) downloadWithRetries(
+func (f *Fetch) downloadWithRetries(
 	response *Response,
 	offset int64,
 	file *os.File,
