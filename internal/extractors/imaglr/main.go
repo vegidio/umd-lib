@@ -7,6 +7,7 @@ import (
 	"github.com/vegidio/umd-lib/internal/model"
 	"github.com/vegidio/umd-lib/internal/utils"
 	"regexp"
+	"slices"
 	"strings"
 )
 
@@ -80,7 +81,7 @@ func (i *Imaglr) QueryMedia(limit int, extensions []string, deep bool) (*model.R
 			}
 		}
 
-		mediaCh := i.fetchMedia(i.source, limit, extensions, deep)
+		mediaCh := i.fetchMedia(i.source, extensions, deep)
 
 		for {
 			select {
@@ -116,7 +117,6 @@ var _ model.Extractor = (*Imaglr)(nil)
 
 func (i *Imaglr) fetchMedia(
 	source model.SourceType,
-	limit int,
 	extensions []string,
 	_ bool,
 ) <-chan model.Result[[]model.Media] {
@@ -139,6 +139,14 @@ func (i *Imaglr) fetchMedia(
 		}
 
 		media := postsToMedia(posts, source.Name())
+
+		// Filter files with certain extensions
+		if len(extensions) > 0 {
+			media = lo.Filter(media, func(m model.Media, _ int) bool {
+				return slices.Contains(extensions, m.Extension)
+			})
+		}
+
 		out <- model.Result[[]model.Media]{Data: media}
 	}()
 

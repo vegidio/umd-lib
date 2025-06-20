@@ -10,7 +10,7 @@ import (
 
 func main() {
 	//log.SetOutput(io.Discard)
-	log.SetLevel(log.DebugLevel)
+	//log.SetLevel(log.DebugLevel)
 	log.SetFormatter(&log.TextFormatter{
 		FullTimestamp:   true,
 		TimestampFormat: "2006-01-02 15:04:05.000",
@@ -21,9 +21,9 @@ func main() {
 
 func query() {
 	extractor, _ := umd.New(nil).
-		FindExtractor("https://www.reddit.com/r/sizetest/comments/1jzv0ge/my_date_outfit_for_you_a_size_test/")
+		FindExtractor("https://www.reddit.com/user/LustChloe/")
 
-	resp, _ := extractor.QueryMedia(99_999, nil, true)
+	resp, _ := extractor.QueryMedia(500, []string{"jpg"}, true)
 
 	err := resp.Track(func(queried, total int) {
 		log.Info("Queried: ", queried, " - Size: ", total)
@@ -50,7 +50,7 @@ func queryDownload() {
 		log.Error(err)
 	}
 
-	co, _ := fetch.GetCookies("https://coomer.su/onlyfans/user/belledelphine")
+	co, _ := fetch.GetCookies("https://coomer.su/onlyfans/user/belledelphine", "header.user-header")
 	header := fetch.CookiesToHeader(co)
 	headers := map[string]string{
 		"Cookie": header,
@@ -103,7 +103,7 @@ func downloadFiles() {
 }
 
 func cookies() {
-	co, err := fetch.GetCookies("https://coomer.su/onlyfans/user/belledelphine")
+	co, err := fetch.GetCookies("https://coomer.su/onlyfans/user/belledelphine", "header.user-header")
 
 	if err != nil {
 		log.Error(err)

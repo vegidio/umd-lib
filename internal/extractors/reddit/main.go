@@ -3,9 +3,11 @@ package reddit
 import (
 	"context"
 	"fmt"
+	"github.com/samber/lo"
 	"github.com/vegidio/umd-lib/internal/model"
 	"github.com/vegidio/umd-lib/internal/utils"
 	"regexp"
+	"slices"
 	"strings"
 )
 
@@ -157,6 +159,13 @@ func (r *Reddit) fetchMedia(
 			media := r.childToMedia(child.Data, source.Type(), source.Name())
 			if deep {
 				media = r.external.ExpandMedia(media, Host, &r.responseMetadata, 5)
+			}
+
+			// Filter files with certain extensions
+			if len(extensions) > 0 {
+				media = lo.Filter(media, func(m model.Media, _ int) bool {
+					return slices.Contains(extensions, m.Extension)
+				})
 			}
 
 			out <- model.Result[[]model.Media]{Data: media}

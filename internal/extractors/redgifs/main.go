@@ -9,6 +9,7 @@ import (
 	"github.com/vegidio/umd-lib/internal/utils"
 	"math"
 	"regexp"
+	"slices"
 	"strings"
 )
 
@@ -185,6 +186,14 @@ func (r *Redgifs) fetchMedia(
 			}
 
 			media := videosToMedia(gif.Data, source.Type())
+
+			// Filter files with certain extensions
+			if len(extensions) > 0 {
+				media = lo.Filter(media, func(m model.Media, _ int) bool {
+					return slices.Contains(extensions, m.Extension)
+				})
+			}
+
 			out <- model.Result[[]model.Media]{Data: media}
 		}
 	}()

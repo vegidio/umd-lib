@@ -3,9 +3,11 @@ package fapello
 import (
 	"context"
 	"fmt"
+	"github.com/samber/lo"
 	"github.com/vegidio/umd-lib/internal/model"
 	"github.com/vegidio/umd-lib/internal/utils"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 )
@@ -145,6 +147,14 @@ func (f *Fapello) fetchMedia(
 			}
 
 			media := postsToMedia(post.Data, source.Type())
+
+			// Filter files with certain extensions
+			if len(extensions) > 0 {
+				media = lo.Filter(media, func(m model.Media, _ int) bool {
+					return slices.Contains(extensions, m.Extension)
+				})
+			}
+			
 			out <- model.Result[[]model.Media]{Data: media}
 		}
 	}()

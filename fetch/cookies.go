@@ -17,7 +17,7 @@ type Cookie struct {
 
 // GetCookies retrieves HTTP cookies from a given URL by navigating to the page using a headless browser.
 // It returns a slice of Cookie objects or an error if the process fails.
-func GetCookies(url string) ([]Cookie, error) {
+func GetCookies(url string, element string) ([]Cookie, error) {
 	browser := rod.New().MustConnect()
 	defer browser.Close()
 
@@ -33,11 +33,24 @@ func GetCookies(url string) ([]Cookie, error) {
 		return nil, fmt.Errorf("could not navigate: %w", err)
 	}
 
-	err = page.WaitLoad()
-	if err != nil {
-		return nil, fmt.Errorf("could not wait load: %w", err)
+	el, err := page.Timeout(10 * time.Second).Element("header.user-header")
+	if err == nil {
+		el.MustWaitVisible()
+		return extractCookies(page)
 	}
 
+	waitNav := page.Timeout(10 * time.Second).WaitNavigation(proto.PageLifecycleEventNameLoad)
+	waitNav()
+
+	el, err = page.Timeout(10 * time.Second).Element("header.user-header")
+	if err != nil {
+		return nil, fmt.Errorf("could not find element: %w", err)
+	}
+
+	return extractCookies(page)
+}
+
+func extractCookies(page *rod.Page) ([]Cookie, error) {
 	rodCookies, err := page.Cookies(nil)
 	if err != nil {
 		return nil, fmt.Errorf("could not get cookies: %w", err)
