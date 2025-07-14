@@ -18,7 +18,7 @@ func (External) ExpandMedia(media []model.Media, ignoreHost string, metadata *mo
 	for _, m := range media {
 		wg.Add(1)
 
-		go func(current Media) {
+		go func(current model.Media) {
 			defer func() {
 				<-sem
 				wg.Done()
@@ -29,27 +29,21 @@ func (External) ExpandMedia(media []model.Media, ignoreHost string, metadata *mo
 			if current.Type == model.Unknown && !utils.HasHost(current.Url, ignoreHost) {
 				extractor, err := New(*metadata).FindExtractor(current.Url)
 				if err != nil {
-					mu.Lock()
-					result = append(result, current)
-					mu.Unlock()
-
+					appendResult(&mu, &result, current)
 					return
 				}
 
-				resp, _ := extractor.QueryMedia(1, make([]string, 0), false)
+				resp, _ := extractor.QueryMedia(1, nil, false)
 				if resp.Error() != nil {
-					mu.Lock()
-					result = append(result, current)
-					mu.Unlock()
+					appendResult(&mu, &result, current)
 					return
 				}
 
-				_, exists := (*metadata)[resp.Extractor]
-				if !exists {
-					mu.Lock()
+				mu.Lock()
+				if _, exists := (*metadata)[resp.Extractor]; !exists {
 					(*metadata)[resp.Extractor] = resp.Metadata[resp.Extractor]
-					mu.Unlock()
 				}
+				mu.Unlock()
 
 				if len(resp.Media) > 0 {
 					mu.Lock()
@@ -58,9 +52,7 @@ func (External) ExpandMedia(media []model.Media, ignoreHost string, metadata *mo
 					mu.Unlock()
 				}
 			} else {
-				mu.Lock()
-				result = append(result, current)
-				mu.Unlock()
+				appendResult(&mu, &result, current)
 			}
 		}(m)
 	}
@@ -71,4 +63,8 @@ func (External) ExpandMedia(media []model.Media, ignoreHost string, metadata *mo
 	return result
 }
 
-// endregion
+func appendResult(mu *sync.Mutex, result *[]model.Media, media model.Media) {
+	mu.Lock()
+	*result = append(*result, media)
+	mu.Unlock()
+}

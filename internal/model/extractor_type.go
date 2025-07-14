@@ -3,8 +3,10 @@ package model
 type ExtractorType int
 
 const (
+	// Generic represents a generic extractor type.
+	Generic ExtractorType = iota
 	// Coomer represents the Coomer (coomer.su) extractor type.
-	Coomer ExtractorType = iota
+	Coomer
 	// Fapello represents the Fapello (fapello.com) extractor type.
 	Fapello
 	// Imaglr represents the Imaglr (imaglr.com) extractor type.
@@ -19,6 +21,8 @@ const (
 
 func (e ExtractorType) String() string {
 	switch e {
+	case Generic:
+		return "Generic"
 	case Coomer:
 		return "Coomer"
 	case Fapello:
