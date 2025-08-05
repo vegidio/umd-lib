@@ -38,7 +38,7 @@ func query() {
 
 func queryDownload() {
 	extractor, _ := umd.New(nil).
-		FindExtractor("https://coomer.su/onlyfans/user/belledelphine")
+		FindExtractor("https://coomer.st/onlyfans/user/belledelphine")
 
 	resp, _ := extractor.QueryMedia(50, nil, true)
 
@@ -50,7 +50,7 @@ func queryDownload() {
 		log.Error(err)
 	}
 
-	co, _ := fetch.GetBrowserCookies("https://coomer.su/onlyfans/user/belledelphine", "header.user-header")
+	co, _ := fetch.GetBrowserCookies("https://coomer.st/onlyfans/user/belledelphine", "header.user-header")
 	header := fetch.CookiesToHeader(co)
 	headers := map[string]string{
 		"Cookie": header,
@@ -103,7 +103,7 @@ func downloadFiles() {
 }
 
 func browserCookies() {
-	co, err := fetch.GetBrowserCookies("https://coomer.su/onlyfans/user/belledelphine", "header.user-header")
+	co, err := fetch.GetBrowserCookies("https://coomer.st/onlyfans/user/belledelphine", "header.user-header")
 
 	if err != nil {
 		log.Error(err)

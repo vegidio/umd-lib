@@ -5,7 +5,7 @@ type ExtractorType int
 const (
 	// Generic represents a generic extractor type.
 	Generic ExtractorType = iota
-	// Coomer represents the Coomer (coomer.su) extractor type.
+	// Coomer represents the Coomer (coomer.st) extractor type.
 	Coomer
 	// Fapello represents the Fapello (fapello.com) extractor type.
 	Fapello

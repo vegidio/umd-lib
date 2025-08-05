@@ -23,8 +23,8 @@ type Coomer struct {
 
 func New(url string, metadata model.Metadata, external model.External) model.Extractor {
 	switch {
-	case utils.HasHost(url, "coomer.su") || utils.HasHost(url, "coomer.party"):
-		baseUrl = "https://coomer.su"
+	case utils.HasHost(url, "coomer.st") || utils.HasHost(url, "coomer.party"):
+		baseUrl = "https://coomer.st"
 
 		return &Coomer{
 			Metadata: metadata,
