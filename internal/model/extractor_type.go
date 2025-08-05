@@ -15,7 +15,7 @@ const (
 	Reddit
 	// RedGifs the RedGifs (redgifs.com) extractor type.
 	RedGifs
-	// Kemono the Kemono (kemono.su) extractor type.
+	// Kemono the Kemono (kemono.cr) extractor type.
 	Kemono
 )
 

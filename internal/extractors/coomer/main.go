@@ -34,8 +34,8 @@ func New(url string, metadata model.Metadata, external model.External) model.Ext
 			services:  "onlyfans|fansly|candfans",
 			external:  external,
 		}
-	case utils.HasHost(url, "kemono.su") || utils.HasHost(url, "kemono.party"):
-		baseUrl = "https://kemono.su"
+	case utils.HasHost(url, "kemono.cr") || utils.HasHost(url, "kemono.party"):
+		baseUrl = "https://kemono.cr"
 
 		return &Coomer{
 			Metadata: metadata,
