@@ -1,9 +1,10 @@
 package extractors
 
 import (
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/vegidio/umd-lib"
-	"testing"
 )
 
 func TestFapello_QueryPost(t *testing.T) {
@@ -20,7 +21,7 @@ func TestFapello_QueryPost(t *testing.T) {
 }
 
 func TestFapello_QueryModel(t *testing.T) {
-	const NumberOfPosts = 91
+	const NumberOfPosts = 98
 
 	extractor, _ := umd.New(nil).FindExtractor("https://fapello.com/darja-sobakinskaja/")
 	resp, _ := extractor.QueryMedia(99999, nil, true)
