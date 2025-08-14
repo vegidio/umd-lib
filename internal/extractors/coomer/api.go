@@ -2,6 +2,7 @@ package coomer
 
 import (
 	"fmt"
+
 	"github.com/vegidio/umd-lib/fetch"
 	"github.com/vegidio/umd-lib/internal/model"
 )
@@ -18,7 +19,7 @@ func getUser(service string, user string) <-chan model.Result[Response] {
 
 		for {
 			var posts []Post
-			url := fmt.Sprintf(baseUrl+"/api/v1/%s/user/%s?o=%d", service, user, offset)
+			url := fmt.Sprintf(baseUrl+"/api/v1/%s/user/%s/posts?o=%d", service, user, offset)
 			resp, err := f.GetResult(url, nil, &posts)
 
 			if err != nil {

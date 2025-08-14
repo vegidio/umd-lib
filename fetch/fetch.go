@@ -2,10 +2,11 @@ package fetch
 
 import (
 	"fmt"
-	"github.com/go-resty/resty/v2"
-	log "github.com/sirupsen/logrus"
 	"net/http"
 	"time"
+
+	"github.com/go-resty/resty/v2"
+	log "github.com/sirupsen/logrus"
 )
 
 type Fetch struct {
@@ -115,6 +116,7 @@ func (f *Fetch) GetText(url string) (string, error) {
 func (f *Fetch) GetResult(url string, headers map[string]string, result interface{}) (*resty.Response, error) {
 	resp, err := f.restClient.R().
 		SetHeaders(headers).
+		ForceContentType("application/json").
 		SetResult(result).
 		Get(url)
 
